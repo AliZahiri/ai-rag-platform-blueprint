@@ -120,6 +120,15 @@ def open_daily_pr_count(repo: str) -> int:
     return int(result.stdout.strip() or "0")
 
 
+def actions_pr_creation_enabled(repo: str) -> bool:
+    result = run(
+        ["gh", "api", f"/repos/{repo}/actions/permissions/workflow", "--jq", ".can_approve_pull_request_reviews"],
+        capture=True,
+        check=False,
+    )
+    return result.returncode == 0 and result.stdout.strip() == "true"
+
+
 def remote_branch_exists(branch: str) -> bool:
     result = run(["git", "ls-remote", "--heads", "origin", branch], capture=True, check=False)
     return bool(result.stdout.strip())
@@ -190,6 +199,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.create_pr:
         if not args.repo:
             raise ValueError("--repo or DAILY_PR_REPO is required when creating a PR")
+        if not actions_pr_creation_enabled(args.repo):
+            write_github_output({"created": "false", "reason": "actions-pr-creation-disabled"})
+            print("GitHub Actions is not allowed to create pull requests for this repository; skipping.")
+            return 0
         if open_daily_pr_count(args.repo) > 0:
             write_github_output({"created": "false", "reason": "open-daily-pr-exists"})
             print("An open daily PR already exists; skipping.")

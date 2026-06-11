@@ -120,6 +120,11 @@ def open_daily_pr_count(repo: str) -> int:
     return int(result.stdout.strip() or "0")
 
 
+def remote_branch_exists(branch: str) -> bool:
+    result = run(["git", "ls-remote", "--heads", "origin", branch], capture=True, check=False)
+    return bool(result.stdout.strip())
+
+
 def write_github_output(values: dict[str, str]) -> None:
     output_path = os.environ.get("GITHUB_OUTPUT")
     if not output_path:
@@ -138,6 +143,14 @@ def apply_task(root: Path, task: dict[str, str]) -> Path:
 
 def create_pr(root: Path, task: dict[str, str], repo: str, base: str) -> None:
     branch = branch_name(task)
+    if remote_branch_exists(branch):
+        print(f"Remote branch {branch} already exists; creating PR from the existing branch.")
+        run(["git", "fetch", "origin", branch])
+        run(["git", "checkout", "-B", branch, f"origin/{branch}"])
+        run(["gh", "pr", "create", "--repo", repo, "--base", base, "--head", branch, "--title", f"daily: {task['title']}", "--body", pr_body(task)])
+        write_github_output({"created": "true", "task_id": task["id"], "branch": branch})
+        return
+
     run(["git", "checkout", "-B", branch])
     target = apply_task(root, task)
     status = run(["git", "status", "--porcelain"], capture=True)

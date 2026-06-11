@@ -5,7 +5,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -120,15 +119,6 @@ def open_daily_pr_count(repo: str) -> int:
     return int(result.stdout.strip() or "0")
 
 
-def actions_pr_creation_enabled(repo: str) -> bool:
-    result = run(
-        ["gh", "api", f"/repos/{repo}/actions/permissions/workflow", "--jq", ".can_approve_pull_request_reviews"],
-        capture=True,
-        check=False,
-    )
-    return result.returncode == 0 and result.stdout.strip() == "true"
-
-
 def remote_branch_exists(branch: str) -> bool:
     result = run(["git", "ls-remote", "--heads", "origin", branch], capture=True, check=False)
     return bool(result.stdout.strip())
@@ -150,14 +140,46 @@ def apply_task(root: Path, task: dict[str, str]) -> Path:
     return target
 
 
+def create_pull_request(repo: str, base: str, branch: str, task: dict[str, str]) -> bool:
+    result = run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            repo,
+            "--base",
+            base,
+            "--head",
+            branch,
+            "--title",
+            f"daily: {task['title']}",
+            "--body",
+            pr_body(task),
+        ],
+        capture=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        print(result.stdout.strip())
+        write_github_output({"created": "true", "task_id": task["id"], "branch": branch})
+        return True
+
+    details = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part and part.strip())
+    print("Unable to create the pull request. The branch was left available for retry.")
+    if details:
+        print(details)
+    write_github_output({"created": "false", "reason": "pr-create-failed", "task_id": task["id"], "branch": branch})
+    return False
+
+
 def create_pr(root: Path, task: dict[str, str], repo: str, base: str) -> None:
     branch = branch_name(task)
     if remote_branch_exists(branch):
         print(f"Remote branch {branch} already exists; creating PR from the existing branch.")
         run(["git", "fetch", "origin", branch])
         run(["git", "checkout", "-B", branch, f"origin/{branch}"])
-        run(["gh", "pr", "create", "--repo", repo, "--base", base, "--head", branch, "--title", f"daily: {task['title']}", "--body", pr_body(task)])
-        write_github_output({"created": "true", "task_id": task["id"], "branch": branch})
+        create_pull_request(repo, base, branch, task)
         return
 
     run(["git", "checkout", "-B", branch])
@@ -170,8 +192,7 @@ def create_pr(root: Path, task: dict[str, str], repo: str, base: str) -> None:
     run(["git", "add", str(target.relative_to(root))])
     run(["git", "commit", "-m", f"daily: {task['title']}"])
     run(["git", "push", "--set-upstream", "origin", branch])
-    run(["gh", "pr", "create", "--repo", repo, "--base", base, "--head", branch, "--title", f"daily: {task['title']}", "--body", pr_body(task)])
-    write_github_output({"created": "true", "task_id": task["id"], "branch": branch})
+    create_pull_request(repo, base, branch, task)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -199,10 +220,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.create_pr:
         if not args.repo:
             raise ValueError("--repo or DAILY_PR_REPO is required when creating a PR")
-        if not actions_pr_creation_enabled(args.repo):
-            write_github_output({"created": "false", "reason": "actions-pr-creation-disabled"})
-            print("GitHub Actions is not allowed to create pull requests for this repository; skipping.")
-            return 0
         if open_daily_pr_count(args.repo) > 0:
             write_github_output({"created": "false", "reason": "open-daily-pr-exists"})
             print("An open daily PR already exists; skipping.")

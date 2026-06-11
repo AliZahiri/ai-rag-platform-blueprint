@@ -1,0 +1,16 @@
+flowchart TD
+    A[Client or Internal App] --> B[API Gateway]
+    B --> C[RAG Orchestrator]
+    C --> D[(PostgreSQL)]
+    C --> E[(Redis)]
+    C --> F[(Vector DB)]
+    C --> G[LLM Router]
+    G --> H[vLLM GPU Backend]
+    H --> G
+    G --> C
+    C --> B
+    B --> A
+    B --> M[Metrics and Logs]
+    C --> M
+    G --> M
+    H --> M

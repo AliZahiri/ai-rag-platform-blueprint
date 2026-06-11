@@ -1,0 +1,58 @@
+{
+  "tasks": [
+    {
+      "id": "benchmark-plan",
+      "title": "Add LLM benchmark planning notes",
+      "target_file": "docs/daily/benchmark-plan.md",
+      "content": "A practical AI platform should separate capacity planning into time-to-first-token, full response time, active concurrent generations, average input tokens, average output tokens, retrieval overhead, and GPU memory pressure.\n\nSuggested benchmark stages:\n\n- Start with one model and one GPU profile.\n- Measure baseline inference without RAG.\n- Add retrieval and compare latency.\n- Test streaming and non-streaming responses separately.\n- Capture saturation behavior before choosing a scale-out pattern.",
+      "portfolio_reason": "Shows production-aware AI/LLM infrastructure planning instead of only tool-level familiarity.",
+      "test_instructions": "Review the markdown file and confirm it describes measurable benchmark inputs.",
+      "change_kind": "docs-only"
+    },
+    {
+      "id": "litellm-routing-notes",
+      "title": "Document LiteLLM routing responsibilities",
+      "target_file": "docs/daily/litellm-routing-notes.md",
+      "content": "LiteLLM should act as the model endpoint abstraction layer. It keeps the RAG orchestrator independent from a specific inference backend and makes future model changes less disruptive.\n\nOperational responsibilities:\n\n- expose one stable endpoint to the RAG layer\n- route requests to one or more model backends\n- isolate model naming from application code\n- support gradual backend changes\n- provide a clear place for retries, budgets, and model policy",
+      "portfolio_reason": "Connects AI platform design with gateway/routing architecture and operational maintainability.",
+      "test_instructions": "Review the markdown file and confirm it does not include secrets or vendor-specific credentials.",
+      "change_kind": "docs-only"
+    },
+    {
+      "id": "vector-db-backup-notes",
+      "title": "Add vector database backup notes",
+      "target_file": "docs/daily/vector-db-backup-notes.md",
+      "content": "Vector database backup planning should cover both the vector collections and the source documents used to create them. A restore is incomplete if embeddings are restored but source files, parser settings, or collection metadata are missing.\n\nMinimum backup targets:\n\n- vector collections\n- document source storage\n- parser and chunking configuration\n- embedding model metadata\n- collection schema and index settings",
+      "portfolio_reason": "Highlights operational depth around RAG systems, especially restore readiness.",
+      "test_instructions": "Review the markdown file and confirm backup targets are clear and actionable.",
+      "change_kind": "docs-only"
+    },
+    {
+      "id": "rag-observability-notes",
+      "title": "Document RAG observability signals",
+      "target_file": "docs/daily/rag-observability-notes.md",
+      "content": "RAG observability should track more than HTTP uptime. Retrieval quality and model behavior affect user experience and incident diagnosis.\n\nUseful signals:\n\n- retrieval latency\n- vector DB query latency\n- retrieved document count\n- empty retrieval rate\n- model latency and token throughput\n- request error rate by gateway, RAG layer, router, and backend\n- GPU memory and utilization",
+      "portfolio_reason": "Shows that observability is treated as part of AI platform architecture, not an afterthought.",
+      "test_instructions": "Review the markdown file and confirm the signals map to platform components.",
+      "change_kind": "docs-only"
+    },
+    {
+      "id": "chat-history-retention",
+      "title": "Add chat history retention notes",
+      "target_file": "docs/daily/chat-history-retention.md",
+      "content": "Chat history retention should be explicit before production rollout. Retention affects database sizing, backup cost, privacy review, and support workflows.\n\nRecommended decisions:\n\n- retention period for user-visible history\n- retention period for operational logs\n- anonymization or deletion rules\n- backup retention and restore scope\n- access boundaries for support and operations users",
+      "portfolio_reason": "Adds production governance detail around AI chat platforms.",
+      "test_instructions": "Review the markdown file and confirm retention decisions are listed without inventing policy values.",
+      "change_kind": "docs-only"
+    },
+    {
+      "id": "gpu-node-runbook-outline",
+      "title": "Add GPU node runbook outline",
+      "target_file": "docs/daily/gpu-node-runbook-outline.md",
+      "content": "A GPU inference node runbook should make model serving repeatable and supportable.\n\nRunbook sections:\n\n- NVIDIA driver and container runtime prerequisites\n- model cache location and ownership\n- vLLM container runtime parameters\n- health checks and smoke tests\n- GPU metrics collection\n- rollback path to the previous model image or config",
+      "portfolio_reason": "Demonstrates practical GPU inference operations as part of platform engineering.",
+      "test_instructions": "Review the markdown file and confirm it remains implementation-neutral and reusable.",
+      "change_kind": "docs-only"
+    }
+  ]
+}

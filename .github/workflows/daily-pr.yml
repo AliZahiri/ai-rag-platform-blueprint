@@ -1,0 +1,41 @@
+name: Daily Portfolio PR
+
+on:
+  schedule:
+    - cron: "40 5 * * *"
+    - cron: "50 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: daily-pr-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run automation tests
+        run: python -m unittest discover -s tests
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create daily PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAILY_PR_REPO: ${{ github.repository }}
+        run: python .github/scripts/daily_pr.py --repo "$DAILY_PR_REPO" --create-pr

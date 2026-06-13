@@ -1,0 +1,35 @@
+name: AI platform task
+description: Track a concrete RAG, LLM routing, observability, or operations improvement.
+title: "[platform]: "
+labels: ["enhancement", "platform"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should improve in the platform?
+      placeholder: Add a deterministic validation step for LiteLLM routing configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List the observable checks that prove the task is complete.
+      placeholder: |
+        - Command exits non-zero for invalid config
+        - Unit tests cover missing model route
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - RAG
+        - LLM routing
+        - Observability
+        - Backup/restore
+        - Security
+    validations:
+      required: true

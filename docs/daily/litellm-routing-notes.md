@@ -1,8 +1,8 @@
-# LiteLLM Routing Responsibilities
+# Document LiteLLM routing responsibilities
 
-LiteLLM should act as the model endpoint abstraction layer. It keeps the RAG
-orchestrator independent from a specific inference backend and makes future
-model changes less disruptive.
+<!-- daily-pr-task: litellm-routing-notes -->
+
+LiteLLM should act as the model endpoint abstraction layer. It keeps the RAG orchestrator independent from a specific inference backend and makes future model changes less disruptive.
 
 Operational responsibilities:
 
@@ -12,7 +12,10 @@ Operational responsibilities:
 - support gradual backend changes
 - provide a clear place for retries, budgets, and model policy
 
-For portfolio review, this documents the boundary between application code,
-model routing, and inference infrastructure. That boundary matters when a team
-wants to compare hosted APIs, local vLLM, or fallback models without rewriting
-the RAG workflow.
+## Portfolio Value
+
+Connects AI platform design with gateway/routing architecture and operational maintainability.
+
+## Validation
+
+Review the markdown file and confirm it does not include secrets or vendor-specific credentials.

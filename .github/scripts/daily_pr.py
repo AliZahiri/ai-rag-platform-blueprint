@@ -10,6 +10,7 @@ from pathlib import Path
 
 MARKER_TEMPLATE = "<!-- daily-pr-task: {task_id} -->"
 BRANCH_PREFIX = "daily/"
+ISSUE_LABEL = "daily-portfolio"
 
 
 def load_tasks(backlog_path: Path) -> list[dict[str, str]]:
@@ -45,6 +46,13 @@ def branch_name(task: dict[str, str]) -> str:
     return f"{BRANCH_PREFIX}{task['id']}"
 
 
+def task_for_branch(tasks: list[dict[str, str]], branch: str) -> dict[str, str] | None:
+    if not branch.startswith(BRANCH_PREFIX):
+        return None
+    task_id = branch.removeprefix(BRANCH_PREFIX)
+    return next((task for task in tasks if task["id"] == task_id), None)
+
+
 def render_task_document(task: dict[str, str]) -> str:
     return "\n".join(
         [
@@ -66,11 +74,53 @@ def render_task_document(task: dict[str, str]) -> str:
     )
 
 
-def pr_body(task: dict[str, str]) -> str:
+def issue_title(task: dict[str, str]) -> str:
+    return f"daily: {task['title']}"
+
+
+def issue_body(task: dict[str, str]) -> str:
+    return "\n".join(
+        [
+            "This issue tracks one item from the daily portfolio automation backlog.",
+            "",
+            task_marker(task["id"]),
+            "",
+            "## Task",
+            task["title"],
+            "",
+            "## Why it matters",
+            task["portfolio_reason"],
+            "",
+            "## Acceptance checks",
+            task["test_instructions"],
+            "",
+            "## Change type",
+            task["change_kind"],
+        ]
+    )
+
+
+def issue_reference(issue: dict[str, object]) -> str:
+    number = issue.get("number")
+    if number:
+        return f"#{number}"
+    return str(issue.get("url", "")).strip()
+
+
+def pr_body(task: dict[str, str], issue: dict[str, object] | None = None) -> str:
+    issue_section: list[str] = []
+    if issue:
+        issue_section = [
+            "## Linked issue",
+            f"Closes {issue_reference(issue)}",
+            "",
+        ]
+
     return "\n".join(
         [
             "This PR was generated from the daily portfolio backlog.",
             "",
+            *issue_section,
             "## What changed",
             f"- Added `{task['target_file']}`",
             f"- Task: `{task['id']}`",
@@ -100,6 +150,10 @@ def run(command: list[str], *, capture: bool = False, check: bool = True) -> sub
 
 
 def open_daily_pr_count(repo: str) -> int:
+    return len(open_daily_prs(repo))
+
+
+def open_daily_prs(repo: str) -> list[dict[str, object]]:
     result = run(
         [
             "gh",
@@ -110,13 +164,145 @@ def open_daily_pr_count(repo: str) -> int:
             "--state",
             "open",
             "--json",
-            "headRefName",
+            "number,title,headRefName,body,url",
             "--jq",
-            f'[.[] | select(.headRefName | startswith("{BRANCH_PREFIX}"))] | length',
+            f'[.[] | select(.headRefName | startswith("{BRANCH_PREFIX}"))]',
         ],
         capture=True,
     )
-    return int(result.stdout.strip() or "0")
+    return json.loads(result.stdout or "[]")
+
+
+def ensure_issue_label(repo: str) -> None:
+    result = run(
+        [
+            "gh",
+            "label",
+            "create",
+            ISSUE_LABEL,
+            "--repo",
+            repo,
+            "--color",
+            "1f6feb",
+            "--description",
+            "Daily portfolio automation backlog",
+            "--force",
+        ],
+        capture=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        details = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part and part.strip())
+        print("Unable to create or update the daily portfolio label.")
+        if details:
+            print(details)
+
+
+def find_existing_issue(repo: str, task: dict[str, str]) -> dict[str, object] | None:
+    result = run(
+        [
+            "gh",
+            "issue",
+            "list",
+            "--repo",
+            repo,
+            "--state",
+            "open",
+            "--limit",
+            "100",
+            "--json",
+            "number,title,body,url",
+        ],
+        capture=True,
+    )
+    marker = task_marker(task["id"])
+    for issue in json.loads(result.stdout or "[]"):
+        if issue.get("title") == issue_title(task) or marker in str(issue.get("body", "")):
+            return issue
+    return None
+
+
+def create_issue(repo: str, task: dict[str, str]) -> dict[str, object]:
+    ensure_issue_label(repo)
+    result = run(
+        [
+            "gh",
+            "issue",
+            "create",
+            "--repo",
+            repo,
+            "--title",
+            issue_title(task),
+            "--body",
+            issue_body(task),
+            "--label",
+            ISSUE_LABEL,
+        ],
+        capture=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        details = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part and part.strip())
+        raise RuntimeError(f"Unable to create issue for {task['id']}:\n{details}")
+
+    url = result.stdout.strip().splitlines()[-1]
+    number_text = url.rstrip("/").split("/")[-1]
+    issue: dict[str, object] = {"title": issue_title(task), "url": url}
+    if number_text.isdigit():
+        issue["number"] = int(number_text)
+    write_github_output({"issue_url": url, "issue_number": str(issue.get("number", ""))})
+    print(f"Created issue {issue_reference(issue)} for task {task['id']}")
+    return issue
+
+
+def ensure_issue(repo: str, task: dict[str, str]) -> dict[str, object]:
+    existing = find_existing_issue(repo, task)
+    if existing:
+        print(f"Using existing issue {issue_reference(existing)} for task {task['id']}")
+        return existing
+    return create_issue(repo, task)
+
+
+def link_issue_to_open_pr(repo: str, pr: dict[str, object], issue: dict[str, object]) -> None:
+    reference = issue_reference(issue)
+    if not reference:
+        return
+    current_body = str(pr.get("body") or "")
+    if reference in current_body:
+        return
+
+    updated_body = current_body.rstrip()
+    if updated_body:
+        updated_body += "\n\n"
+    updated_body += f"## Linked issue\n\nCloses {reference}\n"
+    result = run(
+        [
+            "gh",
+            "pr",
+            "edit",
+            str(pr["number"]),
+            "--repo",
+            repo,
+            "--body",
+            updated_body,
+        ],
+        capture=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        details = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part and part.strip())
+        raise RuntimeError(f"Unable to link issue to PR #{pr['number']}:\n{details}")
+    print(f"Linked issue {reference} to open PR #{pr['number']}")
+
+
+def sync_open_pr_issues(repo: str, prs: list[dict[str, object]], tasks: list[dict[str, str]]) -> None:
+    for pr in prs:
+        task = task_for_branch(tasks, str(pr.get("headRefName", "")))
+        if not task:
+            print(f"Open daily PR #{pr.get('number')} does not match a backlog task; skipping issue sync.")
+            continue
+        issue = ensure_issue(repo, task)
+        link_issue_to_open_pr(repo, pr, issue)
 
 
 def remote_branch_exists(branch: str) -> bool:
@@ -140,7 +326,13 @@ def apply_task(root: Path, task: dict[str, str]) -> Path:
     return target
 
 
-def create_pull_request(repo: str, base: str, branch: str, task: dict[str, str]) -> bool:
+def create_pull_request(
+    repo: str,
+    base: str,
+    branch: str,
+    task: dict[str, str],
+    issue: dict[str, object] | None = None,
+) -> bool:
     result = run(
         [
             "gh",
@@ -155,7 +347,7 @@ def create_pull_request(repo: str, base: str, branch: str, task: dict[str, str])
             "--title",
             f"daily: {task['title']}",
             "--body",
-            pr_body(task),
+            pr_body(task, issue),
         ],
         capture=True,
         check=False,
@@ -179,7 +371,8 @@ def create_pr(root: Path, task: dict[str, str], repo: str, base: str) -> None:
         print(f"Remote branch {branch} already exists; creating PR from the existing branch.")
         run(["git", "fetch", "origin", branch])
         run(["git", "checkout", "-B", branch, f"origin/{branch}"])
-        create_pull_request(repo, base, branch, task)
+        issue = ensure_issue(repo, task)
+        create_pull_request(repo, base, branch, task, issue)
         return
 
     run(["git", "checkout", "-B", branch])
@@ -192,7 +385,8 @@ def create_pr(root: Path, task: dict[str, str], repo: str, base: str) -> None:
     run(["git", "add", str(target.relative_to(root))])
     run(["git", "commit", "-m", f"daily: {task['title']}"])
     run(["git", "push", "--set-upstream", "origin", branch])
-    create_pull_request(repo, base, branch, task)
+    issue = ensure_issue(repo, task)
+    create_pull_request(repo, base, branch, task, issue)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -220,7 +414,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.create_pr:
         if not args.repo:
             raise ValueError("--repo or DAILY_PR_REPO is required when creating a PR")
-        if open_daily_pr_count(args.repo) > 0:
+        open_prs = open_daily_prs(args.repo)
+        if open_prs:
+            sync_open_pr_issues(args.repo, open_prs, tasks)
             write_github_output({"created": "false", "reason": "open-daily-pr-exists"})
             print("An open daily PR already exists; skipping.")
             return 0

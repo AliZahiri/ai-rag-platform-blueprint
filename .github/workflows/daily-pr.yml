@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 concurrency:
   group: daily-pr-${{ github.repository }}
@@ -36,6 +37,6 @@ jobs:
 
       - name: Create daily PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.DAILY_AUTOMATION_TOKEN || github.token }}
           DAILY_PR_REPO: ${{ github.repository }}
         run: python .github/scripts/daily_pr.py --repo "$DAILY_PR_REPO" --create-pr

@@ -1,0 +1,50 @@
+{
+  "routes": [
+    {
+      "alias": "rag-default",
+      "provider": "openai",
+      "model": "gpt-4.1-mini",
+      "env_key": "OPENAI_API_KEY",
+      "fallbacks": ["rag-claude"],
+      "limits": {
+        "rpm": 120,
+        "tpm": 200000,
+        "max_retries": 2,
+        "timeout_seconds": 60,
+        "cost_cap_usd": 25.0
+      },
+      "capabilities": {
+        "streaming": true,
+        "tool_calling": true,
+        "json_mode": true,
+        "context_window": 128000
+      }
+    },
+    {
+      "alias": "rag-claude",
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet-latest",
+      "env_key": "ANTHROPIC_API_KEY",
+      "fallbacks": [],
+      "limits": {
+        "rpm": 60,
+        "tpm": 150000,
+        "max_retries": 2,
+        "timeout_seconds": 60,
+        "cost_cap_usd": 25.0
+      },
+      "capabilities": {
+        "streaming": true,
+        "tool_calling": true,
+        "json_mode": true,
+        "context_window": 200000
+      }
+    }
+  ],
+  "observability": {
+    "latency": true,
+    "tokens": true,
+    "cost": true,
+    "failures": true
+  }
+}

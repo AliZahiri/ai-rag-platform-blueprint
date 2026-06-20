@@ -26,6 +26,7 @@ PostgreSQL, Redis, Vector DB, object/artifact storage, monitoring, logs, backups
 ```
 
 See [docs/architecture.md](docs/architecture.md) and [diagrams/request-flow.mmd](diagrams/request-flow.mmd).
+See [docs/litellm-preflight.md](docs/litellm-preflight.md) for the LiteLLM fail-fast validation checklist.
 
 ## Components
 
@@ -69,6 +70,7 @@ docker compose -f compose/docker-compose.yml --env-file .env up -d
 - Treat `200 concurrent users` and `200 concurrent generations` as different sizing inputs.
 - Add backups for PostgreSQL, vector storage, uploaded files, and model configuration.
 - Add centralized logs before production support begins.
+- Validate LiteLLM route integrity, fallback chains, secret presence, capabilities, and observability before traffic reaches model routes.
 
 ## Security Notes
 

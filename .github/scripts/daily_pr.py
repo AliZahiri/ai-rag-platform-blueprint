@@ -442,6 +442,12 @@ def create_pr(root: Path, task: dict[str, str], repo: str, base: str) -> None:
         print(f"Remote branch {branch} already exists; creating PR from the existing branch.")
         run(["git", "fetch", "origin", branch])
         run(["git", "checkout", "-B", branch, f"origin/{branch}"])
+        targets = apply_task(root, task)
+        status = run(["git", "status", "--porcelain"], capture=True)
+        if status.stdout.strip():
+            run(["git", "add", *[str(target.relative_to(root)) for target in targets]])
+            run(["git", "commit", "-m", f"daily: expand {task['title']}"])
+            run(["git", "push", "origin", branch])
         issue = ensure_issue(repo, task)
         create_pull_request(repo, base, branch, task, issue)
         return

@@ -5,7 +5,7 @@ import json
 import os
 import re
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 MARKER_TEMPLATE = "<!-- daily-pr-task: {task_id} -->"
@@ -20,10 +20,47 @@ def load_tasks(backlog_path: Path) -> list[dict[str, str]]:
         task_id = task.get("id", "")
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", task_id):
             raise ValueError(f"invalid task id: {task_id}")
-        for key in ("title", "target_file", "content", "portfolio_reason", "test_instructions", "change_kind"):
+        for key in ("title", "portfolio_reason", "test_instructions", "change_kind"):
             if not task.get(key):
                 raise ValueError(f"task {task_id} is missing {key}")
+        task_files(task)
     return tasks
+
+
+def validate_relative_path(value: str) -> str:
+    path = PurePosixPath(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"invalid task file path: {value}")
+    return value
+
+
+def task_files(task: dict[str, object]) -> list[dict[str, str]]:
+    files = task.get("files")
+    if files is not None:
+        if not isinstance(files, list) or not files:
+            raise ValueError(f"task {task.get('id', '')} files must be a non-empty list")
+        normalized = []
+        for item in files:
+            if not isinstance(item, dict):
+                raise ValueError(f"task {task.get('id', '')} file entries must be objects")
+            path = str(item.get("path", ""))
+            content = str(item.get("content", ""))
+            if not path or not content:
+                raise ValueError(f"task {task.get('id', '')} file entries need path and content")
+            normalized.append(
+                {
+                    "path": validate_relative_path(path),
+                    "content": content,
+                    "kind": str(item.get("kind", "raw")),
+                }
+            )
+        return normalized
+
+    target_file = str(task.get("target_file", ""))
+    content = str(task.get("content", ""))
+    if not target_file or not content:
+        raise ValueError(f"task {task.get('id', '')} is missing target_file/content or files")
+    return [{"path": validate_relative_path(target_file), "content": content, "kind": "document"}]
 
 
 def task_marker(task_id: str) -> str:
@@ -31,8 +68,11 @@ def task_marker(task_id: str) -> str:
 
 
 def is_task_complete(root: Path, task: dict[str, str]) -> bool:
-    target = root / task["target_file"]
-    return target.exists() and task_marker(task["id"]) in target.read_text(encoding="utf-8")
+    targets = [root / item["path"] for item in task_files(task)]
+    if not all(target.exists() for target in targets):
+        return False
+    marker = task_marker(task["id"])
+    return any(marker in target.read_text(encoding="utf-8") for target in targets)
 
 
 def select_next_task(tasks: list[dict[str, str]], root: Path) -> dict[str, str] | None:
@@ -72,6 +112,16 @@ def render_task_document(task: dict[str, str]) -> str:
             "",
         ]
     )
+
+
+def render_task_file(task: dict[str, str], item: dict[str, str]) -> str:
+    if item.get("kind") == "document":
+        return render_task_document({**task, "content": item["content"]})
+    return item["content"].rstrip() + "\n"
+
+
+def task_file_paths(task: dict[str, object]) -> list[str]:
+    return [item["path"] for item in task_files(task)]
 
 
 def issue_title(task: dict[str, str]) -> str:
@@ -122,7 +172,7 @@ def pr_body(task: dict[str, str], issue: dict[str, object] | None = None) -> str
             "",
             *issue_section,
             "## What changed",
-            f"- Added `{task['target_file']}`",
+            *[f"- Added or updated `{path}`" for path in task_file_paths(task)],
             f"- Task: `{task['id']}`",
             "",
             "## Why it matters",
@@ -295,12 +345,30 @@ def link_issue_to_open_pr(repo: str, pr: dict[str, object], issue: dict[str, obj
     print(f"Linked issue {reference} to open PR #{pr['number']}")
 
 
-def sync_open_pr_issues(repo: str, prs: list[dict[str, object]], tasks: list[dict[str, str]]) -> None:
+def update_open_pr_branch(root: Path, pr: dict[str, object], task: dict[str, str]) -> None:
+    branch = str(pr.get("headRefName", ""))
+    if not branch.startswith(BRANCH_PREFIX):
+        return
+    print(f"Syncing generated files into open PR branch {branch}")
+    run(["git", "fetch", "origin", branch])
+    run(["git", "checkout", "-B", branch, f"origin/{branch}"])
+    targets = apply_task(root, task)
+    status = run(["git", "status", "--porcelain"], capture=True)
+    if not status.stdout.strip():
+        print(f"Open PR branch {branch} already has the current generated files.")
+        return
+    run(["git", "add", *[str(target.relative_to(root)) for target in targets]])
+    run(["git", "commit", "-m", f"daily: expand {task['title']}"])
+    run(["git", "push", "origin", branch])
+
+
+def sync_open_pr_issues(root: Path, repo: str, prs: list[dict[str, object]], tasks: list[dict[str, str]]) -> None:
     for pr in prs:
         task = task_for_branch(tasks, str(pr.get("headRefName", "")))
         if not task:
             print(f"Open daily PR #{pr.get('number')} does not match a backlog task; skipping issue sync.")
             continue
+        update_open_pr_branch(root, pr, task)
         issue = ensure_issue(repo, task)
         link_issue_to_open_pr(repo, pr, issue)
 
@@ -319,11 +387,14 @@ def write_github_output(values: dict[str, str]) -> None:
             output.write(f"{key}={value}\n")
 
 
-def apply_task(root: Path, task: dict[str, str]) -> Path:
-    target = root / task["target_file"]
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(render_task_document(task), encoding="utf-8")
-    return target
+def apply_task(root: Path, task: dict[str, str]) -> list[Path]:
+    targets = []
+    for item in task_files(task):
+        target = root / item["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(render_task_file(task, item), encoding="utf-8")
+        targets.append(target)
+    return targets
 
 
 def create_pull_request(
@@ -376,13 +447,13 @@ def create_pr(root: Path, task: dict[str, str], repo: str, base: str) -> None:
         return
 
     run(["git", "checkout", "-B", branch])
-    target = apply_task(root, task)
+    targets = apply_task(root, task)
     status = run(["git", "status", "--porcelain"], capture=True)
     if not status.stdout.strip():
         write_github_output({"created": "false", "reason": "empty-diff"})
         print("No changes generated; skipping PR.")
         return
-    run(["git", "add", str(target.relative_to(root))])
+    run(["git", "add", *[str(target.relative_to(root)) for target in targets]])
     run(["git", "commit", "-m", f"daily: {task['title']}"])
     run(["git", "push", "--set-upstream", "origin", branch])
     issue = ensure_issue(repo, task)
@@ -408,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Selected task: {task['id']} - {task['title']}")
     if args.dry_run:
-        print(f"Would create {branch_name(task)} and {task['target_file']}")
+        print(f"Would create {branch_name(task)} and {', '.join(task_file_paths(task))}")
         return 0
 
     if args.create_pr:
@@ -416,7 +487,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--repo or DAILY_PR_REPO is required when creating a PR")
         open_prs = open_daily_prs(args.repo)
         if open_prs:
-            sync_open_pr_issues(args.repo, open_prs, tasks)
+            sync_open_pr_issues(root, args.repo, open_prs, tasks)
             write_github_output({"created": "false", "reason": "open-daily-pr-exists"})
             print("An open daily PR already exists; skipping.")
             return 0

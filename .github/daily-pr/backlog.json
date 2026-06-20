@@ -23,9 +23,24 @@
       "title": "Add vector database backup notes",
       "target_file": "docs/daily/vector-db-backup-notes.md",
       "content": "Vector database backup planning should cover both the vector collections and the source documents used to create them. A restore is incomplete if embeddings are restored but source files, parser settings, or collection metadata are missing.\n\nMinimum backup targets:\n\n- vector collections\n- document source storage\n- parser and chunking configuration\n- embedding model metadata\n- collection schema and index settings",
+      "files": [
+        {
+          "path": "docs/daily/vector-db-backup-notes.md",
+          "kind": "document",
+          "content": "Vector database backup planning should cover both the vector collections and the source documents used to create them. A restore is incomplete if embeddings are restored but source files, parser settings, or collection metadata are missing.\n\nMinimum backup targets:\n\n- vector collections\n- document source storage\n- parser and chunking configuration\n- embedding model metadata\n- collection schema and index settings"
+        },
+        {
+          "path": "scripts/rag_backup_plan.py",
+          "content": "#!/usr/bin/env python3\nfrom __future__ import annotations\n\nREQUIRED_BACKUP_TARGETS = (\n    \"vector_collections\",\n    \"source_documents\",\n    \"parser_config\",\n    \"embedding_model_metadata\",\n    \"collection_schema\",\n    \"index_settings\",\n)\n\n\ndef missing_backup_targets(selected: list[str] | tuple[str, ...] | set[str]) -> tuple[str, ...]:\n    selected_targets = set(selected)\n    return tuple(target for target in REQUIRED_BACKUP_TARGETS if target not in selected_targets)\n\n\ndef backup_plan_is_complete(selected: list[str] | tuple[str, ...] | set[str]) -> bool:\n    return not missing_backup_targets(selected)\n"
+        },
+        {
+          "path": "tests/test_rag_backup_plan.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/rag_backup_plan.py\"\nSPEC = importlib.util.spec_from_file_location(\"rag_backup_plan\", SCRIPT_PATH)\nrag_backup_plan = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(rag_backup_plan)\n\n\nclass RagBackupPlanTests(unittest.TestCase):\n    def test_complete_plan_has_no_missing_targets(self):\n        self.assertTrue(rag_backup_plan.backup_plan_is_complete(rag_backup_plan.REQUIRED_BACKUP_TARGETS))\n\n    def test_missing_targets_are_reported_in_required_order(self):\n        missing = rag_backup_plan.missing_backup_targets({\"vector_collections\", \"source_documents\"})\n\n        self.assertEqual(missing[0], \"parser_config\")\n        self.assertIn(\"collection_schema\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ],
       "portfolio_reason": "Highlights operational depth around RAG systems, especially restore readiness.",
       "test_instructions": "Review the markdown file and confirm backup targets are clear and actionable.",
-      "change_kind": "docs-only"
+      "change_kind": "docs-and-code"
     },
     {
       "id": "rag-observability-notes",

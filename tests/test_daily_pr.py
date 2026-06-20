@@ -33,6 +33,25 @@ class DailyPrTests(unittest.TestCase):
 
         self.assertEqual(selected["id"], "sample")
 
+    def test_task_files_support_multiple_generated_files(self):
+        task = {
+            **sample_task(),
+            "files": [
+                {"path": "docs/sample.md", "kind": "document", "content": "Docs"},
+                {"path": "tests/test_sample.py", "content": "print('ok')"},
+            ],
+        }
+
+        files = daily_pr.task_files(task)
+
+        self.assertEqual([item["path"] for item in files], ["docs/sample.md", "tests/test_sample.py"])
+
+    def test_task_files_reject_parent_directory_paths(self):
+        task = {**sample_task(), "files": [{"path": "../bad.py", "content": "bad"}]}
+
+        with self.assertRaises(ValueError):
+            daily_pr.task_files(task)
+
     def test_issue_body_includes_task_marker(self):
         rendered = daily_pr.issue_body(sample_task())
 
@@ -48,8 +67,8 @@ class DailyPrTests(unittest.TestCase):
     def test_select_next_task_skips_completed_task(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            first = {"id": "done", "target_file": "docs/done.md"}
-            second = {"id": "next", "target_file": "docs/next.md"}
+            first = {"id": "done", "target_file": "docs/done.md", "content": "Done"}
+            second = {"id": "next", "target_file": "docs/next.md", "content": "Next"}
             target = root / first["target_file"]
             target.parent.mkdir(parents=True)
             target.write_text(daily_pr.task_marker("done"), encoding="utf-8")

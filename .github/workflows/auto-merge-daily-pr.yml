@@ -1,0 +1,39 @@
+name: Auto Merge Daily PRs
+
+on:
+  workflow_run:
+    workflows: ["Daily Portfolio PR"]
+    types: [completed]
+  schedule:
+    - cron: "0,30 6-18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: auto-merge-daily-pr-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.DAILY_AUTOMATION_TOKEN || github.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Auto merge eligible daily PRs
+        env:
+          GH_TOKEN: ${{ secrets.DAILY_AUTOMATION_TOKEN }}
+          MERGE_METHOD: squash
+          REQUIRE_CODE_CHANGE: "true"
+        run: bash .github/scripts/auto_merge_daily_prs.sh

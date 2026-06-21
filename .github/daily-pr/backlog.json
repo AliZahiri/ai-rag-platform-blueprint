@@ -49,7 +49,22 @@
       "content": "RAG observability should track more than HTTP uptime. Retrieval quality and model behavior affect user experience and incident diagnosis.\n\nUseful signals:\n\n- retrieval latency\n- vector DB query latency\n- retrieved document count\n- empty retrieval rate\n- model latency and token throughput\n- request error rate by gateway, RAG layer, router, and backend\n- GPU memory and utilization",
       "portfolio_reason": "Shows that observability is treated as part of AI platform architecture, not an afterthought.",
       "test_instructions": "Review the markdown file and confirm the signals map to platform components.",
-      "change_kind": "docs-only"
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/rag-observability-notes.md",
+          "kind": "document",
+          "content": "RAG observability should track more than HTTP uptime. Retrieval quality and model behavior affect user experience and incident diagnosis.\n\nUseful signals:\n\n- retrieval latency\n- vector DB query latency\n- retrieved document count\n- empty retrieval rate\n- model latency and token throughput\n- request error rate by gateway, RAG layer, router, and backend\n- GPU memory and utilization"
+        },
+        {
+          "path": "scripts/rag_observability_signals.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_RAG_SIGNALS = (\n    \"retrieval_latency_seconds\",\n    \"vector_db_query_latency_seconds\",\n    \"retrieved_document_count\",\n    \"empty_retrieval_total\",\n    \"model_latency_seconds\",\n    \"model_token_throughput\",\n    \"request_errors_total\",\n    \"gpu_memory_utilization\",\n)\n\n\ndef missing_rag_signals(enabled_signals: list[str] | tuple[str, ...] | set[str]) -> tuple[str, ...]:\n    enabled = set(enabled_signals)\n    return tuple(signal for signal in REQUIRED_RAG_SIGNALS if signal not in enabled)\n\n\ndef rag_observability_is_complete(enabled_signals: list[str] | tuple[str, ...] | set[str]) -> bool:\n    return not missing_rag_signals(enabled_signals)\n"
+        },
+        {
+          "path": "tests/test_rag_observability_signals.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/rag_observability_signals.py\"\nSPEC = importlib.util.spec_from_file_location(\"rag_observability_signals\", SCRIPT_PATH)\nrag_observability_signals = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(rag_observability_signals)\n\n\nclass RagObservabilitySignalsTests(unittest.TestCase):\n    def test_complete_signal_set_passes(self):\n        self.assertTrue(\n            rag_observability_signals.rag_observability_is_complete(\n                rag_observability_signals.REQUIRED_RAG_SIGNALS\n            )\n        )\n\n    def test_missing_signals_are_reported(self):\n        missing = rag_observability_signals.missing_rag_signals({\"retrieval_latency_seconds\"})\n\n        self.assertIn(\"empty_retrieval_total\", missing)\n        self.assertIn(\"gpu_memory_utilization\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
     },
     {
       "id": "chat-history-retention",
@@ -58,7 +73,22 @@
       "content": "Chat history retention should be explicit before production rollout. Retention affects database sizing, backup cost, privacy review, and support workflows.\n\nRecommended decisions:\n\n- retention period for user-visible history\n- retention period for operational logs\n- anonymization or deletion rules\n- backup retention and restore scope\n- access boundaries for support and operations users",
       "portfolio_reason": "Adds production governance detail around AI chat platforms.",
       "test_instructions": "Review the markdown file and confirm retention decisions are listed without inventing policy values.",
-      "change_kind": "docs-only"
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/chat-history-retention.md",
+          "kind": "document",
+          "content": "Chat history retention should be explicit before production rollout. Retention affects database sizing, backup cost, privacy review, and support workflows.\n\nRecommended decisions:\n\n- retention period for user-visible history\n- retention period for operational logs\n- anonymization or deletion rules\n- backup retention and restore scope\n- access boundaries for support and operations users"
+        },
+        {
+          "path": "scripts/chat_retention_policy.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_RETENTION_FIELDS = (\n    \"user_history_days\",\n    \"operational_log_days\",\n    \"anonymization_required\",\n    \"backup_retention_days\",\n    \"support_access_scope\",\n)\n\n\ndef missing_retention_fields(policy: dict[str, object]) -> tuple[str, ...]:\n    return tuple(field for field in REQUIRED_RETENTION_FIELDS if field not in policy)\n\n\ndef retention_policy_is_reviewable(policy: dict[str, object]) -> bool:\n    return not missing_retention_fields(policy)\n"
+        },
+        {
+          "path": "tests/test_chat_retention_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/chat_retention_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"chat_retention_policy\", SCRIPT_PATH)\nchat_retention_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(chat_retention_policy)\n\n\nclass ChatRetentionPolicyTests(unittest.TestCase):\n    def test_complete_policy_is_reviewable(self):\n        policy = {field: \"set\" for field in chat_retention_policy.REQUIRED_RETENTION_FIELDS}\n\n        self.assertTrue(chat_retention_policy.retention_policy_is_reviewable(policy))\n\n    def test_missing_policy_fields_are_reported(self):\n        missing = chat_retention_policy.missing_retention_fields({\"user_history_days\": 30})\n\n        self.assertIn(\"operational_log_days\", missing)\n        self.assertIn(\"support_access_scope\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
     },
     {
       "id": "gpu-node-runbook-outline",
@@ -67,7 +97,22 @@
       "content": "A GPU inference node runbook should make model serving repeatable and supportable.\n\nRunbook sections:\n\n- NVIDIA driver and container runtime prerequisites\n- model cache location and ownership\n- vLLM container runtime parameters\n- health checks and smoke tests\n- GPU metrics collection\n- rollback path to the previous model image or config",
       "portfolio_reason": "Demonstrates practical GPU inference operations as part of platform engineering.",
       "test_instructions": "Review the markdown file and confirm it remains implementation-neutral and reusable.",
-      "change_kind": "docs-only"
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/gpu-node-runbook-outline.md",
+          "kind": "document",
+          "content": "A GPU inference node runbook should make model serving repeatable and supportable.\n\nRunbook sections:\n\n- NVIDIA driver and container runtime prerequisites\n- model cache location and ownership\n- vLLM container runtime parameters\n- health checks and smoke tests\n- GPU metrics collection\n- rollback path to the previous model image or config"
+        },
+        {
+          "path": "scripts/gpu_node_runbook.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_GPU_RUNBOOK_SECTIONS = (\n    \"driver_prerequisites\",\n    \"container_runtime\",\n    \"model_cache\",\n    \"health_checks\",\n    \"gpu_metrics\",\n    \"rollback_path\",\n)\n\n\ndef missing_gpu_runbook_sections(sections: list[str] | tuple[str, ...] | set[str]) -> tuple[str, ...]:\n    present = set(sections)\n    return tuple(section for section in REQUIRED_GPU_RUNBOOK_SECTIONS if section not in present)\n\n\ndef gpu_runbook_is_complete(sections: list[str] | tuple[str, ...] | set[str]) -> bool:\n    return not missing_gpu_runbook_sections(sections)\n"
+        },
+        {
+          "path": "tests/test_gpu_node_runbook.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/gpu_node_runbook.py\"\nSPEC = importlib.util.spec_from_file_location(\"gpu_node_runbook\", SCRIPT_PATH)\ngpu_node_runbook = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(gpu_node_runbook)\n\n\nclass GpuNodeRunbookTests(unittest.TestCase):\n    def test_complete_runbook_passes(self):\n        self.assertTrue(gpu_node_runbook.gpu_runbook_is_complete(gpu_node_runbook.REQUIRED_GPU_RUNBOOK_SECTIONS))\n\n    def test_missing_sections_are_reported(self):\n        missing = gpu_node_runbook.missing_gpu_runbook_sections({\"driver_prerequisites\"})\n\n        self.assertIn(\"model_cache\", missing)\n        self.assertIn(\"rollback_path\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
     }
   ]
 }

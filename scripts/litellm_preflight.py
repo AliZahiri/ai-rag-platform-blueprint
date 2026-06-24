@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from typing import Any
 REQUIRED_LIMITS = ("rpm", "tpm", "max_retries", "timeout_seconds", "cost_cap_usd")
 REQUIRED_CAPABILITIES = ("streaming", "tool_calling", "json_mode")
 REQUIRED_OBSERVABILITY = ("latency", "tokens", "cost", "failures")
+ROUTE_ALIAS_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -24,6 +26,18 @@ def load_config(path: Path) -> dict[str, Any]:
 
 def route_aliases(routes: list[dict[str, Any]]) -> set[str]:
     return {str(route.get("alias", "")) for route in routes if route.get("alias")}
+
+
+def validate_route_alias(raw_alias: Any, index: int, aliases: set[str]) -> tuple[str, list[str]]:
+    alias = str(raw_alias or "").strip()
+    errors: list[str] = []
+    if not alias:
+        return f"routes[{index}]", [f"routes[{index}]: alias is required"]
+    if not ROUTE_ALIAS_PATTERN.fullmatch(alias):
+        errors.append(f"{alias}: alias must use lowercase letters, numbers, and hyphens")
+    if alias in aliases:
+        errors.append(f"{alias}: duplicate route alias")
+    return alias, errors
 
 
 def validate_fallbacks(routes: list[dict[str, Any]]) -> list[str]:
@@ -125,16 +139,13 @@ def validate_config(
         if not isinstance(route, dict):
             errors.append(f"routes[{index}] must be an object")
             continue
-        alias = str(route.get("alias", "")).strip()
+        alias, alias_errors = validate_route_alias(route.get("alias"), index, aliases)
         provider = str(route.get("provider", "")).strip()
         model = str(route.get("model", "")).strip()
         env_key = str(route.get("env_key", "")).strip()
 
-        if not alias:
-            errors.append(f"routes[{index}]: alias is required")
-            alias = f"routes[{index}]"
-        elif alias in aliases:
-            errors.append(f"{alias}: duplicate route alias")
+        if alias_errors:
+            errors.extend(alias_errors)
         aliases.add(alias)
 
         if not provider:

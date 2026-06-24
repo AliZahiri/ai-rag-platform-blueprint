@@ -113,6 +113,72 @@
           "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/gpu_node_runbook.py\"\nSPEC = importlib.util.spec_from_file_location(\"gpu_node_runbook\", SCRIPT_PATH)\ngpu_node_runbook = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(gpu_node_runbook)\n\n\nclass GpuNodeRunbookTests(unittest.TestCase):\n    def test_complete_runbook_passes(self):\n        self.assertTrue(gpu_node_runbook.gpu_runbook_is_complete(gpu_node_runbook.REQUIRED_GPU_RUNBOOK_SECTIONS))\n\n    def test_missing_sections_are_reported(self):\n        missing = gpu_node_runbook.missing_gpu_runbook_sections({\"driver_prerequisites\"})\n\n        self.assertIn(\"model_cache\", missing)\n        self.assertIn(\"rollback_path\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
         }
       ]
+    },
+    {
+      "id": "provider-cost-budget-guard",
+      "title": "Add provider cost budget guard",
+      "portfolio_reason": "Shows that AI provider routing is controlled by budget policy, not only model availability.",
+      "test_instructions": "Run the unit test and confirm invalid provider budget policies are rejected.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/provider-cost-budget-guard.md",
+          "kind": "document",
+          "content": "Provider budget guardrails should be validated before an AI route is allowed to serve production traffic. This keeps provider spend predictable when fallback routing or high-token prompts increase usage.\n\nMinimum policy fields:\n\n- provider name\n- daily spend cap\n- monthly spend cap\n- alert threshold percentage\n- explicit owner for budget review"
+        },
+        {
+          "path": "scripts/provider_budget.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_PROVIDER_BUDGET_FIELDS = (\n    \"provider\",\n    \"daily_cap_usd\",\n    \"monthly_cap_usd\",\n    \"alert_threshold_pct\",\n    \"owner\",\n)\n\n\ndef provider_budget_warnings(policy: dict[str, object]) -> tuple[str, ...]:\n    warnings: list[str] = []\n    for field in REQUIRED_PROVIDER_BUDGET_FIELDS:\n        if field not in policy:\n            warnings.append(f\"{field}_missing\")\n\n    daily_cap = policy.get(\"daily_cap_usd\")\n    monthly_cap = policy.get(\"monthly_cap_usd\")\n    threshold = policy.get(\"alert_threshold_pct\")\n\n    if not isinstance(daily_cap, (int, float)) or daily_cap <= 0:\n        warnings.append(\"daily_cap_usd_must_be_positive\")\n    if not isinstance(monthly_cap, (int, float)) or monthly_cap <= 0:\n        warnings.append(\"monthly_cap_usd_must_be_positive\")\n    if isinstance(daily_cap, (int, float)) and isinstance(monthly_cap, (int, float)) and monthly_cap < daily_cap:\n        warnings.append(\"monthly_cap_usd_must_cover_daily_cap\")\n    if not isinstance(threshold, (int, float)) or not 1 <= threshold <= 100:\n        warnings.append(\"alert_threshold_pct_must_be_1_to_100\")\n\n    return tuple(warnings)\n\n\ndef provider_budget_is_safe(policy: dict[str, object]) -> bool:\n    return not provider_budget_warnings(policy)\n"
+        },
+        {
+          "path": "tests/test_provider_budget.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/provider_budget.py\"\nSPEC = importlib.util.spec_from_file_location(\"provider_budget\", SCRIPT_PATH)\nprovider_budget = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(provider_budget)\n\n\nclass ProviderBudgetTests(unittest.TestCase):\n    def test_valid_budget_policy_is_safe(self):\n        policy = {\n            \"provider\": \"openai\",\n            \"daily_cap_usd\": 25,\n            \"monthly_cap_usd\": 500,\n            \"alert_threshold_pct\": 80,\n            \"owner\": \"platform\",\n        }\n\n        self.assertTrue(provider_budget.provider_budget_is_safe(policy))\n\n    def test_invalid_budget_policy_reports_warnings(self):\n        warnings = provider_budget.provider_budget_warnings({\"daily_cap_usd\": 10, \"monthly_cap_usd\": 5})\n\n        self.assertIn(\"provider_missing\", warnings)\n        self.assertIn(\"monthly_cap_usd_must_cover_daily_cap\", warnings)\n        self.assertIn(\"alert_threshold_pct_must_be_1_to_100\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
+    },
+    {
+      "id": "retrieval-threshold-policy",
+      "title": "Add retrieval threshold policy",
+      "portfolio_reason": "Adds measurable RAG quality controls around retrieval score and chunk count.",
+      "test_instructions": "Run the unit test and confirm unsafe retrieval thresholds are reported.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/retrieval-threshold-policy.md",
+          "kind": "document",
+          "content": "Retrieval policies should define how many chunks can enter the prompt and what minimum similarity score is acceptable. This keeps low-confidence context from silently shaping model answers.\n\nPolicy inputs:\n\n- minimum similarity score\n- maximum retrieved chunks\n- empty retrieval behavior\n- owner for threshold review"
+        },
+        {
+          "path": "scripts/retrieval_threshold_policy.py",
+          "content": "from __future__ import annotations\n\n\ndef retrieval_policy_warnings(policy: dict[str, object]) -> tuple[str, ...]:\n    warnings: list[str] = []\n    min_score = policy.get(\"min_similarity_score\")\n    max_chunks = policy.get(\"max_chunks\")\n    empty_behavior = policy.get(\"empty_retrieval_behavior\")\n\n    if not isinstance(min_score, (int, float)) or not 0 < min_score <= 1:\n        warnings.append(\"min_similarity_score_must_be_between_0_and_1\")\n    if not isinstance(max_chunks, int) or not 1 <= max_chunks <= 20:\n        warnings.append(\"max_chunks_must_be_between_1_and_20\")\n    if empty_behavior not in {\"answer_without_sources\", \"ask_clarifying_question\", \"escalate\"}:\n        warnings.append(\"empty_retrieval_behavior_must_be_explicit\")\n\n    return tuple(warnings)\n\n\ndef retrieval_policy_is_safe(policy: dict[str, object]) -> bool:\n    return not retrieval_policy_warnings(policy)\n"
+        },
+        {
+          "path": "tests/test_retrieval_threshold_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/retrieval_threshold_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"retrieval_threshold_policy\", SCRIPT_PATH)\nretrieval_threshold_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(retrieval_threshold_policy)\n\n\nclass RetrievalThresholdPolicyTests(unittest.TestCase):\n    def test_valid_policy_passes(self):\n        policy = {\n            \"min_similarity_score\": 0.72,\n            \"max_chunks\": 8,\n            \"empty_retrieval_behavior\": \"ask_clarifying_question\",\n        }\n\n        self.assertTrue(retrieval_threshold_policy.retrieval_policy_is_safe(policy))\n\n    def test_invalid_policy_reports_warnings(self):\n        warnings = retrieval_threshold_policy.retrieval_policy_warnings({\"min_similarity_score\": 2, \"max_chunks\": 0})\n\n        self.assertIn(\"min_similarity_score_must_be_between_0_and_1\", warnings)\n        self.assertIn(\"max_chunks_must_be_between_1_and_20\", warnings)\n        self.assertIn(\"empty_retrieval_behavior_must_be_explicit\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
+    },
+    {
+      "id": "prompt-redaction-check",
+      "title": "Add prompt redaction check",
+      "portfolio_reason": "Shows privacy-aware controls for AI prompts before provider calls.",
+      "test_instructions": "Run the unit test and confirm common sensitive values are detected.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/prompt-redaction-check.md",
+          "kind": "document",
+          "content": "Prompt redaction should run before user content is sent to external model providers. The first pass can flag obvious email, phone, and national identifier patterns for masking or manual review.\n\nGuardrail outputs:\n\n- detected sensitive fields\n- redaction required flag\n- safe-to-send decision for provider routing"
+        },
+        {
+          "path": "scripts/prompt_redaction_check.py",
+          "content": "from __future__ import annotations\n\nimport re\n\nSENSITIVE_PATTERNS = {\n    \"email\": re.compile(r\"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\"),\n    \"phone\": re.compile(r\"(?:\\+?98|0)?9\\d{9}\"),\n    \"national_id\": re.compile(r\"\\b\\d{10}\\b\"),\n}\n\n\ndef detected_sensitive_fields(text: str) -> tuple[str, ...]:\n    return tuple(name for name, pattern in SENSITIVE_PATTERNS.items() if pattern.search(text))\n\n\ndef prompt_requires_redaction(text: str) -> bool:\n    return bool(detected_sensitive_fields(text))\n"
+        },
+        {
+          "path": "tests/test_prompt_redaction_check.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/prompt_redaction_check.py\"\nSPEC = importlib.util.spec_from_file_location(\"prompt_redaction_check\", SCRIPT_PATH)\nprompt_redaction_check = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(prompt_redaction_check)\n\n\nclass PromptRedactionCheckTests(unittest.TestCase):\n    def test_sensitive_fields_are_detected(self):\n        fields = prompt_redaction_check.detected_sensitive_fields(\"email me at user@example.com or 09121234567\")\n\n        self.assertIn(\"email\", fields)\n        self.assertIn(\"phone\", fields)\n\n    def test_safe_prompt_does_not_require_redaction(self):\n        self.assertFalse(prompt_redaction_check.prompt_requires_redaction(\"Summarize this public policy.\"))\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
     }
   ]
 }

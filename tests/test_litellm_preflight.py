@@ -101,6 +101,17 @@ class LiteLlmPreflightTests(unittest.TestCase):
         self.assertIn("rag-default: capabilities.json_mode must be true for the RAG route", errors)
         self.assertIn("rag-default: capabilities.context_window must be at least 8192", errors)
 
+    def test_route_aliases_must_be_stable_slug_values(self):
+        config = copy.deepcopy(VALID_CONFIG)
+        config["routes"][0]["alias"] = "RAG Default"
+
+        errors = validate_config(config)
+
+        self.assertIn(
+            "RAG Default: alias must use lowercase letters, numbers, and hyphens",
+            errors,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

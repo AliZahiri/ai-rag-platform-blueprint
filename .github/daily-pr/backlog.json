@@ -179,6 +179,50 @@
           "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/prompt_redaction_check.py\"\nSPEC = importlib.util.spec_from_file_location(\"prompt_redaction_check\", SCRIPT_PATH)\nprompt_redaction_check = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(prompt_redaction_check)\n\n\nclass PromptRedactionCheckTests(unittest.TestCase):\n    def test_sensitive_fields_are_detected(self):\n        fields = prompt_redaction_check.detected_sensitive_fields(\"email me at user@example.com or 09121234567\")\n\n        self.assertIn(\"email\", fields)\n        self.assertIn(\"phone\", fields)\n\n    def test_safe_prompt_does_not_require_redaction(self):\n        self.assertFalse(prompt_redaction_check.prompt_requires_redaction(\"Summarize this public policy.\"))\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
         }
       ]
+    },
+    {
+      "id": "model-fallback-budget-policy",
+      "title": "Add model fallback budget policy",
+      "portfolio_reason": "Shows model fallback is controlled by spend and reliability policy instead of blind retries.",
+      "test_instructions": "Run the unit test and confirm fallback candidates are rejected when they exceed budget.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/model-fallback-budget-policy.md",
+          "kind": "document",
+          "content": "Fallback routing should consider reliability and spend together. A fallback model is only useful if it stays inside the request budget and preserves the required capabilities.\n\nPolicy checks:\n\n- fallback model alias is defined\n- estimated cost stays within request budget\n- fallback preserves required capabilities\n- retry count is bounded"
+        },
+        {
+          "path": "scripts/fallback_budget_policy.py",
+          "content": "from __future__ import annotations\n\n\ndef fallback_budget_warnings(policy: dict[str, object]) -> tuple[str, ...]:\n    warnings: list[str] = []\n    if not policy.get(\"fallback_alias\"):\n        warnings.append(\"fallback_alias_missing\")\n    estimated_cost = policy.get(\"estimated_cost_usd\")\n    request_budget = policy.get(\"request_budget_usd\")\n    if not isinstance(estimated_cost, (int, float)) or estimated_cost < 0:\n        warnings.append(\"estimated_cost_usd_must_be_non_negative\")\n    if not isinstance(request_budget, (int, float)) or request_budget <= 0:\n        warnings.append(\"request_budget_usd_must_be_positive\")\n    if isinstance(estimated_cost, (int, float)) and isinstance(request_budget, (int, float)) and estimated_cost > request_budget:\n        warnings.append(\"fallback_cost_exceeds_request_budget\")\n    if policy.get(\"required_capabilities_preserved\") is not True:\n        warnings.append(\"required_capabilities_must_be_preserved\")\n    return tuple(warnings)\n\n\ndef fallback_budget_is_safe(policy: dict[str, object]) -> bool:\n    return not fallback_budget_warnings(policy)\n"
+        },
+        {
+          "path": "tests/test_fallback_budget_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/fallback_budget_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"fallback_budget_policy\", SCRIPT_PATH)\nfallback_budget_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(fallback_budget_policy)\n\n\nclass FallbackBudgetPolicyTests(unittest.TestCase):\n    def test_safe_fallback_budget_passes(self):\n        policy = {\"fallback_alias\": \"rag-fallback\", \"estimated_cost_usd\": 0.05, \"request_budget_usd\": 0.10, \"required_capabilities_preserved\": True}\n\n        self.assertTrue(fallback_budget_policy.fallback_budget_is_safe(policy))\n\n    def test_expensive_fallback_is_reported(self):\n        warnings = fallback_budget_policy.fallback_budget_warnings({\"fallback_alias\": \"rag-fallback\", \"estimated_cost_usd\": 1.5, \"request_budget_usd\": 1.0})\n\n        self.assertIn(\"fallback_cost_exceeds_request_budget\", warnings)\n        self.assertIn(\"required_capabilities_must_be_preserved\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
+    },
+    {
+      "id": "chunking-profile-policy",
+      "title": "Add document chunking profile policy",
+      "portfolio_reason": "Demonstrates RAG ingestion controls for repeatable retrieval quality.",
+      "test_instructions": "Run the unit test and confirm overlap is smaller than chunk size.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/chunking-profile-policy.md",
+          "kind": "document",
+          "content": "Document chunking should be explicit and testable. Chunk size, overlap, and parser name affect retrieval quality and should be tracked with the embedding model.\n\nPolicy checks:\n\n- chunk size is bounded\n- overlap is smaller than chunk size\n- parser profile is named\n- embedding model is recorded"
+        },
+        {
+          "path": "scripts/chunking_profile_policy.py",
+          "content": "from __future__ import annotations\n\n\ndef chunking_profile_warnings(profile: dict[str, object]) -> tuple[str, ...]:\n    warnings: list[str] = []\n    chunk_size = profile.get(\"chunk_size\")\n    overlap = profile.get(\"overlap\")\n    if not isinstance(chunk_size, int) or not 200 <= chunk_size <= 4000:\n        warnings.append(\"chunk_size_must_be_between_200_and_4000\")\n    if not isinstance(overlap, int) or overlap < 0:\n        warnings.append(\"overlap_must_be_non_negative\")\n    if isinstance(chunk_size, int) and isinstance(overlap, int) and overlap >= chunk_size:\n        warnings.append(\"overlap_must_be_smaller_than_chunk_size\")\n    if not profile.get(\"parser_profile\"):\n        warnings.append(\"parser_profile_missing\")\n    if not profile.get(\"embedding_model\"):\n        warnings.append(\"embedding_model_missing\")\n    return tuple(warnings)\n\n\ndef chunking_profile_is_safe(profile: dict[str, object]) -> bool:\n    return not chunking_profile_warnings(profile)\n"
+        },
+        {
+          "path": "tests/test_chunking_profile_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/chunking_profile_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"chunking_profile_policy\", SCRIPT_PATH)\nchunking_profile_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(chunking_profile_policy)\n\n\nclass ChunkingProfilePolicyTests(unittest.TestCase):\n    def test_valid_profile_passes(self):\n        profile = {\"chunk_size\": 1200, \"overlap\": 120, \"parser_profile\": \"pdf-default\", \"embedding_model\": \"text-embedding\"}\n\n        self.assertTrue(chunking_profile_policy.chunking_profile_is_safe(profile))\n\n    def test_invalid_overlap_is_reported(self):\n        warnings = chunking_profile_policy.chunking_profile_warnings({\"chunk_size\": 500, \"overlap\": 500})\n\n        self.assertIn(\"overlap_must_be_smaller_than_chunk_size\", warnings)\n        self.assertIn(\"parser_profile_missing\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
     }
   ]
 }

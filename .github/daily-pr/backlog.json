@@ -223,6 +223,50 @@
           "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/chunking_profile_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"chunking_profile_policy\", SCRIPT_PATH)\nchunking_profile_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(chunking_profile_policy)\n\n\nclass ChunkingProfilePolicyTests(unittest.TestCase):\n    def test_valid_profile_passes(self):\n        profile = {\"chunk_size\": 1200, \"overlap\": 120, \"parser_profile\": \"pdf-default\", \"embedding_model\": \"text-embedding\"}\n\n        self.assertTrue(chunking_profile_policy.chunking_profile_is_safe(profile))\n\n    def test_invalid_overlap_is_reported(self):\n        warnings = chunking_profile_policy.chunking_profile_warnings({\"chunk_size\": 500, \"overlap\": 500})\n\n        self.assertIn(\"overlap_must_be_smaller_than_chunk_size\", warnings)\n        self.assertIn(\"parser_profile_missing\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
         }
       ]
+    },
+    {
+      "id": "rag-answer-citation-policy",
+      "title": "Add RAG answer citation policy",
+      "portfolio_reason": "Shows generated answers are tied back to retrieved evidence instead of unsupported model output.",
+      "test_instructions": "Run the unit test and confirm answer plans require citations when source-backed answers are expected.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/rag-answer-citation-policy.md",
+          "kind": "document",
+          "content": "RAG answers should clearly indicate when a response is backed by retrieved sources. Citation policy keeps the answer contract explicit and helps reviewers spot unsupported responses.\n\nPolicy checks:\n\n- answer mode is declared\n- source-backed answers include citation count\n- minimum citation count is met\n- unsupported answers are labeled clearly"
+        },
+        {
+          "path": "scripts/citation_policy.py",
+          "content": "from __future__ import annotations\n\n\ndef citation_policy_warnings(answer_plan: dict[str, object], *, min_citations: int = 1) -> tuple[str, ...]:\n    warnings: list[str] = []\n    mode = answer_plan.get(\"mode\")\n    citation_count = answer_plan.get(\"citation_count\", 0)\n    if mode not in {\"source_backed\", \"general_guidance\", \"clarifying_question\"}:\n        warnings.append(\"answer_mode_must_be_declared\")\n    if mode == \"source_backed\":\n        if not isinstance(citation_count, int) or citation_count < min_citations:\n            warnings.append(\"source_backed_answer_needs_citations\")\n    return tuple(warnings)\n\n\ndef citation_policy_is_satisfied(answer_plan: dict[str, object], *, min_citations: int = 1) -> bool:\n    return not citation_policy_warnings(answer_plan, min_citations=min_citations)\n"
+        },
+        {
+          "path": "tests/test_citation_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/citation_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"citation_policy\", SCRIPT_PATH)\ncitation_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(citation_policy)\n\n\nclass CitationPolicyTests(unittest.TestCase):\n    def test_source_backed_answer_requires_citation(self):\n        warnings = citation_policy.citation_policy_warnings({\"mode\": \"source_backed\", \"citation_count\": 0})\n\n        self.assertIn(\"source_backed_answer_needs_citations\", warnings)\n\n    def test_general_guidance_can_pass_without_citations(self):\n        self.assertTrue(citation_policy.citation_policy_is_satisfied({\"mode\": \"general_guidance\"}))\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
+    },
+    {
+      "id": "embedding-cache-policy",
+      "title": "Add embedding cache policy",
+      "portfolio_reason": "Shows RAG ingestion cost and latency are controlled by deterministic cache keys.",
+      "test_instructions": "Run the unit test and confirm cache keys include document id, parser profile, and embedding model.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/embedding-cache-policy.md",
+          "kind": "document",
+          "content": "Embedding cache policy should avoid recomputing vectors when document content and ingestion settings are unchanged. Cache keys must include the embedding model and parser profile to prevent stale reuse.\n\nCache key inputs:\n\n- document id\n- content checksum\n- parser profile\n- embedding model"
+        },
+        {
+          "path": "scripts/embedding_cache_policy.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_CACHE_KEY_FIELDS = (\"document_id\", \"content_checksum\", \"parser_profile\", \"embedding_model\")\n\n\ndef missing_cache_key_fields(metadata: dict[str, object]) -> tuple[str, ...]:\n    return tuple(field for field in REQUIRED_CACHE_KEY_FIELDS if not metadata.get(field))\n\n\ndef embedding_cache_key_is_stable(metadata: dict[str, object]) -> bool:\n    return not missing_cache_key_fields(metadata)\n"
+        },
+        {
+          "path": "tests/test_embedding_cache_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/embedding_cache_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"embedding_cache_policy\", SCRIPT_PATH)\nembedding_cache_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(embedding_cache_policy)\n\n\nclass EmbeddingCachePolicyTests(unittest.TestCase):\n    def test_complete_metadata_has_stable_key(self):\n        metadata = {field: \"value\" for field in embedding_cache_policy.REQUIRED_CACHE_KEY_FIELDS}\n\n        self.assertTrue(embedding_cache_policy.embedding_cache_key_is_stable(metadata))\n\n    def test_missing_embedding_model_is_reported(self):\n        missing = embedding_cache_policy.missing_cache_key_fields({\"document_id\": \"1\"})\n\n        self.assertIn(\"embedding_model\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
     }
   ]
 }

@@ -267,6 +267,50 @@
           "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/embedding_cache_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"embedding_cache_policy\", SCRIPT_PATH)\nembedding_cache_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(embedding_cache_policy)\n\n\nclass EmbeddingCachePolicyTests(unittest.TestCase):\n    def test_complete_metadata_has_stable_key(self):\n        metadata = {field: \"value\" for field in embedding_cache_policy.REQUIRED_CACHE_KEY_FIELDS}\n\n        self.assertTrue(embedding_cache_policy.embedding_cache_key_is_stable(metadata))\n\n    def test_missing_embedding_model_is_reported(self):\n        missing = embedding_cache_policy.missing_cache_key_fields({\"document_id\": \"1\"})\n\n        self.assertIn(\"embedding_model\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
         }
       ]
+    },
+    {
+      "id": "llm-response-sla-policy",
+      "title": "Add LLM response SLA policy",
+      "portfolio_reason": "Shows AI platform readiness includes latency and error budget expectations.",
+      "test_instructions": "Run the unit test and confirm invalid latency SLOs are rejected.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/llm-response-sla-policy.md",
+          "kind": "document",
+          "content": "LLM response SLA policy should define user-facing latency expectations and error budget boundaries. This helps separate experimental model routing from production behavior.\n\nPolicy fields:\n\n- p95 latency target\n- maximum error rate\n- streaming enabled flag\n- escalation owner"
+        },
+        {
+          "path": "scripts/response_sla_policy.py",
+          "content": "from __future__ import annotations\n\n\ndef response_sla_warnings(policy: dict[str, object]) -> tuple[str, ...]:\n    warnings: list[str] = []\n    p95 = policy.get(\"p95_latency_ms\")\n    error_rate = policy.get(\"max_error_rate_pct\")\n    if not isinstance(p95, int) or p95 <= 0:\n        warnings.append(\"p95_latency_ms_must_be_positive\")\n    if not isinstance(error_rate, (int, float)) or not 0 <= error_rate <= 100:\n        warnings.append(\"max_error_rate_pct_must_be_between_0_and_100\")\n    if policy.get(\"streaming_enabled\") is not True:\n        warnings.append(\"streaming_enabled_should_be_true_for_chat_sla\")\n    if not policy.get(\"owner\"):\n        warnings.append(\"owner_missing\")\n    return tuple(warnings)\n\n\ndef response_sla_is_ready(policy: dict[str, object]) -> bool:\n    return not response_sla_warnings(policy)\n"
+        },
+        {
+          "path": "tests/test_response_sla_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/response_sla_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"response_sla_policy\", SCRIPT_PATH)\nresponse_sla_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(response_sla_policy)\n\n\nclass ResponseSlaPolicyTests(unittest.TestCase):\n    def test_ready_sla_passes(self):\n        policy = {\"p95_latency_ms\": 2500, \"max_error_rate_pct\": 1.0, \"streaming_enabled\": True, \"owner\": \"platform\"}\n\n        self.assertTrue(response_sla_policy.response_sla_is_ready(policy))\n\n    def test_invalid_sla_reports_warnings(self):\n        warnings = response_sla_policy.response_sla_warnings({\"p95_latency_ms\": 0, \"max_error_rate_pct\": 120})\n\n        self.assertIn(\"p95_latency_ms_must_be_positive\", warnings)\n        self.assertIn(\"owner_missing\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
+    },
+    {
+      "id": "document-ingestion-idempotency",
+      "title": "Add document ingestion idempotency policy",
+      "portfolio_reason": "Shows ingestion jobs can be retried without duplicating vector records.",
+      "test_instructions": "Run the unit test and confirm idempotency keys require document and parser metadata.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/document-ingestion-idempotency.md",
+          "kind": "document",
+          "content": "Document ingestion should be idempotent so retries do not duplicate chunks or embeddings. The idempotency key should include document identity and ingestion settings.\n\nKey fields:\n\n- document id\n- source checksum\n- parser profile\n- chunking version"
+        },
+        {
+          "path": "scripts/ingestion_idempotency.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_IDEMPOTENCY_FIELDS = (\"document_id\", \"source_checksum\", \"parser_profile\", \"chunking_version\")\n\n\ndef missing_idempotency_fields(metadata: dict[str, object]) -> tuple[str, ...]:\n    return tuple(field for field in REQUIRED_IDEMPOTENCY_FIELDS if not metadata.get(field))\n\n\ndef ingestion_is_idempotent(metadata: dict[str, object]) -> bool:\n    return not missing_idempotency_fields(metadata)\n"
+        },
+        {
+          "path": "tests/test_ingestion_idempotency.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/ingestion_idempotency.py\"\nSPEC = importlib.util.spec_from_file_location(\"ingestion_idempotency\", SCRIPT_PATH)\ningestion_idempotency = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(ingestion_idempotency)\n\n\nclass IngestionIdempotencyTests(unittest.TestCase):\n    def test_complete_metadata_is_idempotent(self):\n        metadata = {field: \"value\" for field in ingestion_idempotency.REQUIRED_IDEMPOTENCY_FIELDS}\n\n        self.assertTrue(ingestion_idempotency.ingestion_is_idempotent(metadata))\n\n    def test_missing_fields_are_reported(self):\n        missing = ingestion_idempotency.missing_idempotency_fields({\"document_id\": \"doc-1\"})\n\n        self.assertIn(\"source_checksum\", missing)\n        self.assertIn(\"chunking_version\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
     }
   ]
 }

@@ -19,6 +19,18 @@ class EmbeddingCachePolicyTests(unittest.TestCase):
 
         self.assertIn("embedding_model", missing)
 
+    def test_cache_key_is_deterministic_and_normalized(self):
+        key = embedding_cache_policy.build_embedding_cache_key(
+            {
+                "document_id": " Case-42 ",
+                "content_checksum": "ABC123",
+                "parser_profile": "PDF-Default",
+                "embedding_model": "Text-Embedding-3",
+            }
+        )
+
+        self.assertEqual(key, "case-42:abc123:pdf-default:text-embedding-3")
+
 
 if __name__ == "__main__":
     unittest.main()

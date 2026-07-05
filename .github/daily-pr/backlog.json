@@ -355,6 +355,50 @@
           "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/fallback_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"fallback_policy\", SCRIPT_PATH)\nfallback_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(fallback_policy)\n\n\nclass FallbackPolicyTests(unittest.TestCase):\n    def test_linear_fallback_chain_passes(self):\n        self.assertTrue(fallback_policy.fallback_policy_is_valid({\"fast\": \"safe\", \"safe\": None}, primary=\"fast\"))\n\n    def test_cycle_and_missing_target_are_reported(self):\n        warnings = fallback_policy.fallback_policy_warnings({\"fast\": \"safe\", \"safe\": \"fast\", \"cheap\": \"missing\"}, primary=\"fast\")\n\n        self.assertIn(\"fast_fallback_cycle_detected\", warnings)\n        self.assertIn(\"cheap_fallback_target_missing\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
         }
       ]
+    },
+    {
+      "id": "rag-source-freshness-policy",
+      "title": "Add RAG source freshness policy",
+      "portfolio_reason": "Shows retrieval quality accounts for stale or unknown legal/source metadata before answers are trusted.",
+      "test_instructions": "Run the unit test and confirm stale or undated sources are flagged.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/rag-source-freshness-policy.md",
+          "kind": "document",
+          "content": "RAG source freshness policy should flag stale, undated, or unknown-status sources before they are used in high-confidence answers. This makes legal and operational retrieval safer.\n\nPolicy checks:\n\n- source status is known\n- last reviewed date is present\n- source age is within threshold\n- stale sources require reviewer mode"
+        },
+        {
+          "path": "scripts/source_freshness_policy.py",
+          "content": "from __future__ import annotations\n\nfrom datetime import date\n\n\ndef source_freshness_warnings(source: dict[str, object], *, today: date, max_age_days: int = 180) -> tuple[str, ...]:\n    warnings: list[str] = []\n    status = source.get(\"status\")\n    if status not in {\"valid\", \"amended\", \"review_required\"}:\n        warnings.append(\"source_status_unknown\")\n    reviewed_at = source.get(\"last_reviewed_at\")\n    if not isinstance(reviewed_at, date):\n        warnings.append(\"last_reviewed_at_missing\")\n        return tuple(warnings)\n    if (today - reviewed_at).days > max_age_days:\n        warnings.append(\"source_review_is_stale\")\n    return tuple(warnings)\n\n\ndef source_is_fresh(source: dict[str, object], *, today: date, max_age_days: int = 180) -> bool:\n    return not source_freshness_warnings(source, today=today, max_age_days=max_age_days)\n"
+        },
+        {
+          "path": "tests/test_source_freshness_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom datetime import date\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/source_freshness_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"source_freshness_policy\", SCRIPT_PATH)\nsource_freshness_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(source_freshness_policy)\n\n\nclass SourceFreshnessPolicyTests(unittest.TestCase):\n    def test_recent_valid_source_passes(self):\n        source = {\"status\": \"valid\", \"last_reviewed_at\": date(2026, 7, 1)}\n\n        self.assertTrue(source_freshness_policy.source_is_fresh(source, today=date(2026, 7, 5)))\n\n    def test_stale_source_is_reported(self):\n        warnings = source_freshness_policy.source_freshness_warnings({\"status\": \"valid\", \"last_reviewed_at\": date(2025, 1, 1)}, today=date(2026, 7, 5))\n\n        self.assertIn(\"source_review_is_stale\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
+    },
+    {
+      "id": "pii-redaction-coverage-policy",
+      "title": "Add PII redaction coverage policy",
+      "portfolio_reason": "Shows AI gateway safety includes privacy coverage before prompts leave the platform.",
+      "test_instructions": "Run the unit test and confirm required PII categories are covered.",
+      "change_kind": "docs-and-code",
+      "files": [
+        {
+          "path": "docs/daily/pii-redaction-coverage-policy.md",
+          "kind": "document",
+          "content": "PII redaction coverage policy should verify that provider-bound prompts have masking rules for the most sensitive categories.\n\nRequired categories:\n\n- phone\n- national id\n- bank card\n- address\n- case tracking number"
+        },
+        {
+          "path": "scripts/pii_redaction_policy.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_PII_CATEGORIES = (\"phone\", \"national_id\", \"bank_card\", \"address\", \"case_tracking_number\")\n\n\ndef missing_redaction_categories(configured_categories: set[str]) -> tuple[str, ...]:\n    return tuple(category for category in REQUIRED_PII_CATEGORIES if category not in configured_categories)\n\n\ndef redaction_coverage_is_complete(configured_categories: set[str]) -> bool:\n    return not missing_redaction_categories(configured_categories)\n"
+        },
+        {
+          "path": "tests/test_pii_redaction_policy.py",
+          "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/pii_redaction_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"pii_redaction_policy\", SCRIPT_PATH)\npii_redaction_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(pii_redaction_policy)\n\n\nclass PiiRedactionPolicyTests(unittest.TestCase):\n    def test_complete_coverage_passes(self):\n        self.assertTrue(pii_redaction_policy.redaction_coverage_is_complete(set(pii_redaction_policy.REQUIRED_PII_CATEGORIES)))\n\n    def test_missing_categories_are_reported(self):\n        missing = pii_redaction_policy.missing_redaction_categories({\"phone\"})\n\n        self.assertIn(\"national_id\", missing)\n        self.assertIn(\"case_tracking_number\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ]
     }
   ]
 }

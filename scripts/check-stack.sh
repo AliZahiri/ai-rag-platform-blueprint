@@ -4,8 +4,10 @@ set -euo pipefail
 COMPOSE_FILE="${COMPOSE_FILE:-compose/docker-compose.yml}"
 ENV_FILE="${ENV_FILE:-.env}"
 STRICT="${STRICT:-false}"
+LITELLM_PREFLIGHT_CONFIG="${LITELLM_PREFLIGHT_CONFIG:-configs/litellm-routes.example.json}"
 
 CHECKS=(
+  "litellm-config=${LITELLM_PREFLIGHT_CONFIG}"
   "vector-db=http://localhost:${VECTOR_DB_PORT:-6333}/healthz"
   "prometheus=http://localhost:${PROMETHEUS_PORT:-9090}/-/ready"
   "grafana=http://localhost:${GRAFANA_PORT:-3000}/api/health"
@@ -19,10 +21,16 @@ print_checks() {
   done
 }
 
+run_litellm_preflight() {
+  python3 scripts/litellm_preflight.py --config "$LITELLM_PREFLIGHT_CONFIG"
+}
+
 if [[ "${1:-}" == "--plan" ]]; then
   print_checks
   exit 0
 fi
+
+run_litellm_preflight
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 

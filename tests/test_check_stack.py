@@ -19,6 +19,7 @@ class CheckStackTests(unittest.TestCase):
         self.assertIn("vector-db", result.stdout)
         self.assertIn("prometheus", result.stdout)
         self.assertIn("grafana", result.stdout)
+        self.assertIn("litellm-config", result.stdout)
 
 
 if __name__ == "__main__":

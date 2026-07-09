@@ -83,6 +83,14 @@ class LiteLlmPreflightTests(unittest.TestCase):
 
         self.assertIn("rag-default: fallback missing-route is not defined as a route alias", errors)
 
+    def test_missing_model_route_is_reported(self):
+        config = copy.deepcopy(VALID_CONFIG)
+        config["routes"][0]["model"] = ""
+
+        errors = validate_config(config)
+
+        self.assertIn("rag-default: model is required", errors)
+
     def test_fallback_cycle_is_reported(self):
         config = copy.deepcopy(VALID_CONFIG)
         config["routes"][1]["fallbacks"] = ["rag-default"]

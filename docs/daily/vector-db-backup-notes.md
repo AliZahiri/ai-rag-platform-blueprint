@@ -8,9 +8,18 @@ Minimum backup targets:
 
 - vector collections
 - document source storage
+- collection metadata
 - parser and chunking configuration
 - embedding model metadata
 - collection schema and index settings
+
+Restore verification checks:
+
+- confirm the target collection exists
+- compare collection schema and index settings
+- compare source document counts
+- run a sample similarity query
+- verify embedding model metadata matches the restored collection
 
 ## Portfolio Value
 

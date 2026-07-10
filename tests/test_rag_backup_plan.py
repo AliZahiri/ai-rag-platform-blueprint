@@ -1,4 +1,6 @@
 import importlib.util
+import json
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -38,6 +40,38 @@ class RagBackupPlanTests(unittest.TestCase):
                 rag_backup_plan.REQUIRED_RESTORE_CHECKS,
             )
         )
+
+    def test_verification_report_is_machine_readable(self):
+        report = rag_backup_plan.verification_report(
+            {"vector_collections", "source_documents"},
+            {"collection_exists"},
+        )
+
+        self.assertFalse(report["complete"])
+        self.assertIn("collection_metadata", report["missing_targets"])
+        self.assertIn("sample_similarity_query", report["missing_restore_checks"])
+
+    def test_cli_returns_json_report(self):
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/rag_backup_plan.py",
+                "--target",
+                "vector_collections",
+                "--check",
+                "collection_exists",
+                "--json",
+            ],
+            cwd=Path(__file__).resolve().parents[1],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["complete"])
+        self.assertIn("source_documents", report["missing_targets"])
 
 
 if __name__ == "__main__":

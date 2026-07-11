@@ -399,6 +399,50 @@
           "content": "import importlib.util\nimport unittest\nfrom pathlib import Path\n\nSCRIPT_PATH = Path(__file__).resolve().parents[1] / \"scripts/pii_redaction_policy.py\"\nSPEC = importlib.util.spec_from_file_location(\"pii_redaction_policy\", SCRIPT_PATH)\npii_redaction_policy = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(pii_redaction_policy)\n\n\nclass PiiRedactionPolicyTests(unittest.TestCase):\n    def test_complete_coverage_passes(self):\n        self.assertTrue(pii_redaction_policy.redaction_coverage_is_complete(set(pii_redaction_policy.REQUIRED_PII_CATEGORIES)))\n\n    def test_missing_categories_are_reported(self):\n        missing = pii_redaction_policy.missing_redaction_categories({\"phone\"})\n\n        self.assertIn(\"national_id\", missing)\n        self.assertIn(\"case_tracking_number\", missing)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
         }
       ]
+    },
+    {
+      "id": "model-route-health-contract",
+      "title": "Add model route health contract checks",
+      "files": [
+        {
+          "path": "docs/daily/model-route-health-contract.md",
+          "kind": "document",
+          "content": "Model route health should be validated before a RAG workflow depends on a provider path. A route can exist in configuration while still being unsafe for production traffic if limits, fallback behavior, or required capabilities are missing.\n\nContract checks:\n\n- route alias is present and stable\n- provider and model identifiers are configured\n- timeout and retry limits are bounded\n- streaming and JSON mode support are declared\n- fallback route is optional but must point to a known alias"
+        },
+        {
+          "path": "scripts/model_route_health.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_ROUTE_FIELDS = (\"alias\", \"provider\", \"model\")\nREQUIRED_LIMITS = (\"timeout_seconds\", \"max_retries\")\nREQUIRED_CAPABILITIES = (\"streaming\", \"json_mode\")\n\n\ndef route_health_warnings(route: dict[str, object], known_aliases: set[str] | None = None) -> tuple[str, ...]:\n    aliases = set() if known_aliases is None else known_aliases\n    warnings: list[str] = []\n    for field in REQUIRED_ROUTE_FIELDS:\n        if not str(route.get(field, \"\")).strip():\n            warnings.append(f\"{field}_is_required\")\n\n    limits = route.get(\"limits\")\n    if not isinstance(limits, dict):\n        warnings.append(\"limits_must_be_object\")\n    else:\n        for field in REQUIRED_LIMITS:\n            value = limits.get(field)\n            if not isinstance(value, (int, float)) or value <= 0:\n                warnings.append(f\"limits_{field}_must_be_positive\")\n\n    capabilities = route.get(\"capabilities\")\n    if not isinstance(capabilities, dict):\n        warnings.append(\"capabilities_must_be_object\")\n    else:\n        for field in REQUIRED_CAPABILITIES:\n            if capabilities.get(field) is not True:\n                warnings.append(f\"capabilities_{field}_must_be_true\")\n\n    fallback = str(route.get(\"fallback\", \"\")).strip()\n    if fallback and fallback not in aliases:\n        warnings.append(\"fallback_alias_is_unknown\")\n    return tuple(warnings)\n\n\ndef route_health_is_ready(route: dict[str, object], known_aliases: set[str] | None = None) -> bool:\n    return not route_health_warnings(route, known_aliases)\n"
+        },
+        {
+          "path": "tests/test_model_route_health.py",
+          "content": "import unittest\n\nfrom scripts.model_route_health import route_health_is_ready, route_health_warnings\n\n\nclass ModelRouteHealthTests(unittest.TestCase):\n    def test_ready_route_passes_contract(self):\n        route = {\n            \"alias\": \"rag-primary\",\n            \"provider\": \"openai\",\n            \"model\": \"gpt-example\",\n            \"limits\": {\"timeout_seconds\": 30, \"max_retries\": 1},\n            \"capabilities\": {\"streaming\": True, \"json_mode\": True},\n            \"fallback\": \"rag-fallback\",\n        }\n\n        self.assertTrue(route_health_is_ready(route, {\"rag-primary\", \"rag-fallback\"}))\n\n    def test_missing_contract_items_are_reported(self):\n        warnings = route_health_warnings({\"alias\": \"rag-primary\", \"fallback\": \"missing\"}, {\"rag-primary\"})\n\n        self.assertIn(\"provider_is_required\", warnings)\n        self.assertIn(\"limits_must_be_object\", warnings)\n        self.assertIn(\"fallback_alias_is_unknown\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ],
+      "portfolio_reason": "Shows practical readiness checks around LLM route configuration rather than only architecture notes.",
+      "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm model route contract failures are reported clearly.",
+      "change_kind": "docs-and-code"
+    },
+    {
+      "id": "rag-evaluation-snapshot",
+      "title": "Add RAG evaluation snapshot helper",
+      "files": [
+        {
+          "path": "docs/daily/rag-evaluation-snapshot.md",
+          "kind": "document",
+          "content": "RAG quality should be checked with repeatable snapshots, not only ad hoc chat testing. A compact evaluation snapshot can track whether answers include citations, whether retrieval returned enough sources, and whether freshness requirements were met.\n\nSuggested snapshot fields:\n\n- question id\n- retrieved source count\n- answer includes citation\n- source freshness status\n- reviewer outcome"
+        },
+        {
+          "path": "scripts/rag_evaluation_snapshot.py",
+          "content": "from __future__ import annotations\n\nREQUIRED_SNAPSHOT_FIELDS = (\"question_id\", \"retrieved_sources\", \"has_citation\", \"freshness_ok\", \"review_passed\")\n\n\ndef snapshot_warnings(snapshot: dict[str, object], *, min_sources: int = 2) -> tuple[str, ...]:\n    warnings: list[str] = []\n    for field in REQUIRED_SNAPSHOT_FIELDS:\n        if field not in snapshot:\n            warnings.append(f\"{field}_is_required\")\n\n    sources = snapshot.get(\"retrieved_sources\")\n    if not isinstance(sources, int) or sources < min_sources:\n        warnings.append(\"retrieved_sources_below_threshold\")\n    if snapshot.get(\"has_citation\") is not True:\n        warnings.append(\"answer_missing_citation\")\n    if snapshot.get(\"freshness_ok\") is not True:\n        warnings.append(\"source_freshness_not_verified\")\n    if snapshot.get(\"review_passed\") is not True:\n        warnings.append(\"review_not_passed\")\n    return tuple(warnings)\n\n\ndef snapshot_passes(snapshot: dict[str, object], *, min_sources: int = 2) -> bool:\n    return not snapshot_warnings(snapshot, min_sources=min_sources)\n"
+        },
+        {
+          "path": "tests/test_rag_evaluation_snapshot.py",
+          "content": "import unittest\n\nfrom scripts.rag_evaluation_snapshot import snapshot_passes, snapshot_warnings\n\n\nclass RagEvaluationSnapshotTests(unittest.TestCase):\n    def test_complete_snapshot_passes(self):\n        snapshot = {\n            \"question_id\": \"q-001\",\n            \"retrieved_sources\": 3,\n            \"has_citation\": True,\n            \"freshness_ok\": True,\n            \"review_passed\": True,\n        }\n\n        self.assertTrue(snapshot_passes(snapshot))\n\n    def test_weak_snapshot_reports_actionable_warnings(self):\n        warnings = snapshot_warnings({\"question_id\": \"q-002\", \"retrieved_sources\": 1})\n\n        self.assertIn(\"retrieved_sources_below_threshold\", warnings)\n        self.assertIn(\"answer_missing_citation\", warnings)\n        self.assertIn(\"review_passed_is_required\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        }
+      ],
+      "portfolio_reason": "Connects RAG platform work to measurable evaluation and answer quality controls.",
+      "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm incomplete snapshots produce actionable warnings.",
+      "change_kind": "docs-and-code"
     }
   ]
 }

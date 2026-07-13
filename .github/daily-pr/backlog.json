@@ -465,6 +465,28 @@
     "portfolio_reason": "Makes the RAG blueprint demonstrate a concrete control for route context limits and answer quality.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm oversized retrieval context is rejected.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "citation-source-id-policy",
+    "title": "Add citation source identifier policy",
+    "files": [
+      {
+        "path": "docs/daily/citation-source-id-policy.md",
+        "kind": "document",
+        "content": "RAG citations should point to stable source identifiers so an answer can be audited after documents are re-indexed. The policy checks that every cited source has a unique non-empty identifier and a resolvable location."
+      },
+      {
+        "path": "scripts/citation_source_ids.py",
+        "content": "from __future__ import annotations\n\n\ndef citation_source_warnings(sources: list[dict[str, object]]) -> tuple[str, ...]:\n    warnings: list[str] = []\n    identifiers = [str(source.get(\"source_id\", \"\")).strip() for source in sources]\n    if any(not identifier for identifier in identifiers):\n        warnings.append(\"citation_source_id_is_required\")\n    if len(set(identifiers)) != len(identifiers):\n        warnings.append(\"citation_source_ids_must_be_unique\")\n    if any(not str(source.get(\"location\", \"\")).strip() for source in sources):\n        warnings.append(\"citation_source_location_is_required\")\n    return tuple(warnings)\n\n\ndef citations_are_traceable(sources: list[dict[str, object]]) -> bool:\n    return bool(sources) and not citation_source_warnings(sources)\n"
+      },
+      {
+        "path": "tests/test_citation_source_ids.py",
+        "content": "import unittest\n\nfrom scripts.citation_source_ids import citation_source_warnings, citations_are_traceable\n\n\nclass CitationSourceIdTests(unittest.TestCase):\n    def test_unique_located_sources_are_traceable(self):\n        self.assertTrue(citations_are_traceable([{\"source_id\": \"law-1\", \"location\": \"article-1\"}]))\n\n    def test_duplicate_sources_are_reported(self):\n        warnings = citation_source_warnings([{\"source_id\": \"law-1\", \"location\": \"a\"}, {\"source_id\": \"law-1\", \"location\": \"b\"}])\n\n        self.assertIn(\"citation_source_ids_must_be_unique\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Demonstrates that RAG citations stay auditable through stable source references.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm duplicate source identifiers are rejected.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

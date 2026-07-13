@@ -442,7 +442,29 @@
       ],
       "portfolio_reason": "Connects RAG platform work to measurable evaluation and answer quality controls.",
       "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm incomplete snapshots produce actionable warnings.",
-      "change_kind": "docs-and-code"
-    }
-  ]
+    "change_kind": "docs-and-code"
+  },
+  {
+    "id": "context-window-budget-guard",
+    "title": "Add RAG context window budget guard",
+    "files": [
+      {
+        "path": "docs/daily/context-window-budget-guard.md",
+        "kind": "document",
+        "content": "RAG retrieval should reserve enough context for system instructions and the generated answer before chunks are sent to a model. A deterministic budget guard keeps retrieval from silently overflowing a model route context window.\n\nGuard inputs:\n\n- estimated tokens per retrieved chunk\n- route context budget\n- reserved response tokens\n- clear warnings for invalid or oversized inputs"
+      },
+      {
+        "path": "scripts/context_window_budget.py",
+        "content": "from __future__ import annotations\n\n\ndef context_budget_warnings(chunk_tokens: list[int], *, max_context_tokens: int, reserved_output_tokens: int) -> tuple[str, ...]:\n    warnings: list[str] = []\n    if max_context_tokens <= 0:\n        warnings.append(\"max_context_tokens_must_be_positive\")\n    if reserved_output_tokens < 0:\n        warnings.append(\"reserved_output_tokens_must_not_be_negative\")\n    if any(not isinstance(tokens, int) or tokens < 0 for tokens in chunk_tokens):\n        warnings.append(\"chunk_tokens_must_be_non_negative_integers\")\n    if warnings:\n        return tuple(warnings)\n    if sum(chunk_tokens) + reserved_output_tokens > max_context_tokens:\n        warnings.append(\"retrieved_context_exceeds_route_budget\")\n    return tuple(warnings)\n\n\ndef context_budget_is_safe(chunk_tokens: list[int], *, max_context_tokens: int, reserved_output_tokens: int) -> bool:\n    return not context_budget_warnings(\n        chunk_tokens,\n        max_context_tokens=max_context_tokens,\n        reserved_output_tokens=reserved_output_tokens,\n    )\n"
+      },
+      {
+        "path": "tests/test_context_window_budget.py",
+        "content": "import unittest\n\nfrom scripts.context_window_budget import context_budget_is_safe, context_budget_warnings\n\n\nclass ContextWindowBudgetTests(unittest.TestCase):\n    def test_context_with_reserved_output_passes(self):\n        self.assertTrue(context_budget_is_safe([400, 600], max_context_tokens=2000, reserved_output_tokens=500))\n\n    def test_over_budget_context_is_reported(self):\n        warnings = context_budget_warnings([900, 900], max_context_tokens=2000, reserved_output_tokens=300)\n\n        self.assertIn(\"retrieved_context_exceeds_route_budget\", warnings)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Makes the RAG blueprint demonstrate a concrete control for route context limits and answer quality.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm oversized retrieval context is rejected.",
+    "change_kind": "docs-and-code"
+  }
+]
 }

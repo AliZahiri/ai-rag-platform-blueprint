@@ -487,6 +487,28 @@
     "portfolio_reason": "Demonstrates that RAG citations stay auditable through stable source references.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm duplicate source identifiers are rejected.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "retrieval-source-deduplication",
+    "title": "Add retrieval source deduplication helper",
+    "files": [
+      {
+        "path": "docs/daily/retrieval-source-deduplication.md",
+        "kind": "document",
+        "content": "RAG retrieval can return overlapping chunks from the same source. Deduplicating stable source identifiers before answer generation keeps context focused, reduces token cost, and makes citation counts meaningful."
+      },
+      {
+        "path": "scripts/retrieval_source_deduplication.py",
+        "content": "from __future__ import annotations\n\n\ndef unique_source_ids(results: list[dict[str, object]]) -> tuple[str, ...]:\n    identifiers: list[str] = []\n    for result in results:\n        source_id = str(result.get(\"source_id\", \"\")).strip()\n        if source_id and source_id not in identifiers:\n            identifiers.append(source_id)\n    return tuple(identifiers)\n\n\ndef duplicate_source_ids(results: list[dict[str, object]]) -> tuple[str, ...]:\n    seen: set[str] = set()\n    duplicates: list[str] = []\n    for result in results:\n        source_id = str(result.get(\"source_id\", \"\")).strip()\n        if source_id and source_id in seen and source_id not in duplicates:\n            duplicates.append(source_id)\n        seen.add(source_id)\n    return tuple(duplicates)\n"
+      },
+      {
+        "path": "tests/test_retrieval_source_deduplication.py",
+        "content": "import unittest\n\nfrom scripts.retrieval_source_deduplication import duplicate_source_ids, unique_source_ids\n\n\nclass RetrievalSourceDeduplicationTests(unittest.TestCase):\n    def test_unique_source_ids_keep_first_seen_order(self):\n        results = [{\"source_id\": \"law-1\"}, {\"source_id\": \"law-2\"}, {\"source_id\": \"law-1\"}]\n\n        self.assertEqual((\"law-1\", \"law-2\"), unique_source_ids(results))\n\n    def test_duplicate_source_ids_are_reported_once(self):\n        self.assertEqual((\"law-1\",), duplicate_source_ids([{\"source_id\": \"law-1\"}, {\"source_id\": \"law-1\"}]))\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Adds a small but production-relevant retrieval control for context efficiency and trustworthy citations.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm duplicate source identifiers are detected deterministically.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

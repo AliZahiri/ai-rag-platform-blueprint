@@ -531,6 +531,28 @@
     "portfolio_reason": "Makes RAG answer quality controls explicit through a deterministic retrieval confidence gate.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm low-confidence sources are reported.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "retrieval-evidence-coverage-policy",
+    "title": "Add retrieval evidence coverage policy",
+    "files": [
+      {
+        "path": "docs/daily/retrieval-evidence-coverage-policy.md",
+        "kind": "document",
+        "content": "Grounded answers should expose which factual claim identifiers are supported by retrieved evidence. The policy rejects missing or blank evidence mappings so an evaluation gate can distinguish fully cited answers from partially grounded output."
+      },
+      {
+        "path": "scripts/retrieval_evidence_coverage.py",
+        "content": "from __future__ import annotations\n\n\ndef uncovered_claim_ids(claim_ids: list[str] | tuple[str, ...], evidence_by_claim: dict[str, list[str]]) -> tuple[str, ...]:\n    missing: list[str] = []\n    for claim_id in claim_ids:\n        normalized = claim_id.strip()\n        evidence_ids = evidence_by_claim.get(normalized, [])\n        if not normalized or not any(evidence_id.strip() for evidence_id in evidence_ids):\n            missing.append(normalized or \"unknown\")\n    return tuple(missing)\n\n\ndef evidence_coverage_is_complete(claim_ids: list[str] | tuple[str, ...], evidence_by_claim: dict[str, list[str]]) -> bool:\n    return bool(claim_ids) and not uncovered_claim_ids(claim_ids, evidence_by_claim)\n"
+      },
+      {
+        "path": "tests/test_retrieval_evidence_coverage.py",
+        "content": "import unittest\n\nfrom scripts.retrieval_evidence_coverage import evidence_coverage_is_complete, uncovered_claim_ids\n\n\nclass RetrievalEvidenceCoverageTests(unittest.TestCase):\n    def test_all_claims_with_evidence_pass(self):\n        self.assertTrue(evidence_coverage_is_complete([\"claim-1\"], {\"claim-1\": [\"source-7\"]}))\n\n    def test_claim_without_evidence_is_reported(self):\n        self.assertEqual((\"claim-2\",), uncovered_claim_ids([\"claim-1\", \"claim-2\"], {\"claim-1\": [\"source-7\"]}))\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Adds a deterministic citation completeness gate that can be used by RAG evaluation and release checks.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm claims without evidence are reported.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

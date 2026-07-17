@@ -171,6 +171,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--require-secrets", action="store_true")
     parser.add_argument("--min-context-window", type=int, default=8192)
     parser.add_argument(
+        "--json",
+        dest="json_output",
+        action="store_true",
+        help="Print one machine-readable validation report to stdout.",
+    )
+    parser.add_argument(
         "--live-probe",
         action="store_true",
         help="Reserved for explicit provider liveness probes. No paid calls run by default.",
@@ -178,24 +184,44 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def validation_report(errors: list[str], *, live_probe_requested: bool) -> dict[str, object]:
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "live_probe_requested": live_probe_requested,
+    }
+
+
 def main() -> int:
     args = parse_args()
-    config = load_config(Path(args.config))
-    errors = validate_config(
-        config,
-        require_secrets=args.require_secrets,
-        min_context_window=args.min_context_window,
-    )
+    try:
+        config = load_config(Path(args.config))
+        errors = validate_config(
+            config,
+            require_secrets=args.require_secrets,
+            min_context_window=args.min_context_window,
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        errors = [f"unable to load config: {error}"]
 
-    if args.live_probe:
+    if args.json_output:
+        print(
+            json.dumps(
+                validation_report(errors, live_probe_requested=args.live_probe),
+                sort_keys=True,
+            )
+        )
+    elif args.live_probe:
         print("live probes are opt-in and must be wired per provider; no provider calls were made")
 
     if errors:
-        for error in errors:
-            print(f"preflight-error: {error}", file=sys.stderr)
+        if not args.json_output:
+            for error in errors:
+                print(f"preflight-error: {error}", file=sys.stderr)
         return 1
 
-    print("LiteLLM preflight validation passed")
+    if not args.json_output:
+        print("LiteLLM preflight validation passed")
     return 0
 
 

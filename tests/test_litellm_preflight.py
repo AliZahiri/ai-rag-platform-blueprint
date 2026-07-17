@@ -1,9 +1,13 @@
 import copy
+import json
 import os
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.litellm_preflight import load_config, validate_config
+from scripts.litellm_preflight import load_config, validate_config, validation_report
 
 
 VALID_CONFIG = {
@@ -119,6 +123,87 @@ class LiteLlmPreflightTests(unittest.TestCase):
             "RAG Default: alias must use lowercase letters, numbers, and hyphens",
             errors,
         )
+
+    def test_validation_report_has_stable_machine_readable_fields(self):
+        report = validation_report(["invalid"], live_probe_requested=True)
+
+        self.assertEqual(
+            report,
+            {
+                "ok": False,
+                "errors": ["invalid"],
+                "live_probe_requested": True,
+            },
+        )
+
+    def test_json_cli_reports_valid_config(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/litellm_preflight.py",
+                "--config",
+                "configs/litellm-routes.example.json",
+                "--json",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(
+            json.loads(result.stdout),
+            {
+                "ok": True,
+                "errors": [],
+                "live_probe_requested": False,
+            },
+        )
+        self.assertEqual(result.stderr, "")
+
+    def test_json_cli_reports_invalid_config_and_nonzero_exit(self):
+        config = copy.deepcopy(VALID_CONFIG)
+        config["routes"][0]["model"] = ""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "invalid.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/litellm_preflight.py",
+                    "--config",
+                    str(config_path),
+                    "--json",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["ok"])
+        self.assertIn("rag-default: model is required", report["errors"])
+        self.assertFalse(report["live_probe_requested"])
+        self.assertEqual(result.stderr, "")
+
+    def test_json_cli_keeps_live_probe_notice_inside_report(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/litellm_preflight.py",
+                "--config",
+                "configs/litellm-routes.example.json",
+                "--live-probe",
+                "--json",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertTrue(json.loads(result.stdout)["live_probe_requested"])
+        self.assertEqual(result.stdout.count("\n"), 1)
 
 
 if __name__ == "__main__":

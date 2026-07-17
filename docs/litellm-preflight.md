@@ -28,6 +28,34 @@ python scripts/litellm_preflight.py --config configs/litellm-routes.example.json
 
 This mode validates route integrity, fallback safety, capability declarations, route limits, and observability flags. It does not call providers and does not spend tokens.
 
+## Structured CI Output
+
+Use `--json` when a deployment gate needs to consume the result:
+
+```bash
+python scripts/litellm_preflight.py \
+  --config configs/litellm-routes.example.json \
+  --json
+```
+
+The command prints exactly one JSON object to standard output:
+
+```json
+{
+  "errors": [],
+  "live_probe_requested": false,
+  "ok": true
+}
+```
+
+The fields are stable:
+
+- `ok` is `true` only when validation has no errors.
+- `errors` contains individual validation or config-loading errors.
+- `live_probe_requested` records whether `--live-probe` was requested; it does not imply that a provider call ran.
+
+Invalid configurations still emit valid JSON and exit non-zero. JSON mode keeps standard error empty so CI can parse standard output as a single report. Without `--json`, the existing human-readable output remains the default.
+
 ## Secret Presence Check
 
 Use the same helper with explicit secret presence checks in private deployment validation:

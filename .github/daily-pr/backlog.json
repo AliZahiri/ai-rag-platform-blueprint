@@ -553,6 +553,50 @@
     "portfolio_reason": "Adds a deterministic citation completeness gate that can be used by RAG evaluation and release checks.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm claims without evidence are reported.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "citation-span-integrity-policy",
+    "title": "Add citation span integrity policy",
+    "files": [
+      {
+        "path": "docs/daily/citation-span-integrity-policy.md",
+        "kind": "document",
+        "content": "Generated answers can cite the correct source identifier while quoting the wrong byte range. This policy validates bounded citation offsets, non-empty source identifiers, and exact quote-to-source matches before citation metadata is exposed to users. The check is deterministic and requires no provider calls."
+      },
+      {
+        "path": "scripts/citation_span_integrity.py",
+        "content": "from __future__ import annotations\n\n\ndef citation_span_violations(source_text: str, citations: list[dict[str, object]]) -> tuple[str, ...]:\n    violations: list[str] = []\n    for index, citation in enumerate(citations):\n        prefix = f\"citation_{index}\"\n        if not str(citation.get(\"source_id\", \"\")).strip():\n            violations.append(f\"{prefix}_source_id_required\")\n        start = citation.get(\"start\")\n        end = citation.get(\"end\")\n        if (\n            not isinstance(start, int)\n            or isinstance(start, bool)\n            or not isinstance(end, int)\n            or isinstance(end, bool)\n            or start < 0\n            or end <= start\n            or end > len(source_text)\n        ):\n            violations.append(f\"{prefix}_span_out_of_bounds\")\n            continue\n        quote = citation.get(\"quote\")\n        if not isinstance(quote, str) or source_text[start:end] != quote:\n            violations.append(f\"{prefix}_quote_mismatch\")\n    return tuple(violations)\n\n\ndef citation_spans_are_valid(source_text: str, citations: list[dict[str, object]]) -> bool:\n    return bool(citations) and not citation_span_violations(source_text, citations)\n"
+      },
+      {
+        "path": "tests/test_citation_span_integrity.py",
+        "content": "import unittest\n\nfrom scripts.citation_span_integrity import citation_span_violations, citation_spans_are_valid\n\n\nclass CitationSpanIntegrityTests(unittest.TestCase):\n    def test_exact_source_span_passes(self):\n        self.assertTrue(citation_spans_are_valid(\"alpha beta\", [{\"source_id\": \"doc-1\", \"start\": 6, \"end\": 10, \"quote\": \"beta\"}]))\n\n    def test_quote_mismatch_is_reported(self):\n        violations = citation_span_violations(\"alpha beta\", [{\"source_id\": \"doc-1\", \"start\": 6, \"end\": 10, \"quote\": \"alpha\"}])\n        self.assertEqual((\"citation_0_quote_mismatch\",), violations)\n\n    def test_out_of_bounds_span_does_not_slice_source(self):\n        violations = citation_span_violations(\"alpha\", [{\"source_id\": \"doc-1\", \"start\": 0, \"end\": 99, \"quote\": \"alpha\"}])\n        self.assertEqual((\"citation_0_span_out_of_bounds\",), violations)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Adds a testable traceability control that prevents stale or malformed citation offsets from misrepresenting retrieved evidence.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm exact spans pass while quote mismatches and invalid bounds are rejected.",
+    "change_kind": "docs-and-code"
+  },
+  {
+    "id": "provider-capability-match-policy",
+    "title": "Add provider capability match policy",
+    "files": [
+      {
+        "path": "docs/daily/provider-capability-match-policy.md",
+        "kind": "document",
+        "content": "A model route should be selected only when its declared provider capabilities satisfy the workload contract. The policy checks required boolean capabilities and the minimum context window locally so unsupported JSON, tool, vision, or long-context workloads fail before a paid request is attempted."
+      },
+      {
+        "path": "scripts/provider_capability_match.py",
+        "content": "from __future__ import annotations\n\n\ndef provider_capability_violations(provider: dict[str, object], *, required: tuple[str, ...], required_context_tokens: int) -> tuple[str, ...]:\n    violations: list[str] = []\n    if required_context_tokens <= 0:\n        raise ValueError(\"required context tokens must be positive\")\n    capabilities = provider.get(\"capabilities\")\n    if not isinstance(capabilities, dict):\n        violations.append(\"capabilities_must_be_object\")\n    else:\n        for capability in required:\n            if capabilities.get(capability) is not True:\n                violations.append(f\"capability_{capability}_is_required\")\n    max_context_tokens = provider.get(\"max_context_tokens\")\n    if not isinstance(max_context_tokens, int) or isinstance(max_context_tokens, bool) or max_context_tokens < required_context_tokens:\n        violations.append(\"context_window_is_insufficient\")\n    return tuple(violations)\n\n\ndef provider_matches_workload(provider: dict[str, object], *, required: tuple[str, ...], required_context_tokens: int) -> bool:\n    return not provider_capability_violations(provider, required=required, required_context_tokens=required_context_tokens)\n"
+      },
+      {
+        "path": "tests/test_provider_capability_match.py",
+        "content": "import unittest\n\nfrom scripts.provider_capability_match import provider_capability_violations, provider_matches_workload\n\n\nclass ProviderCapabilityMatchTests(unittest.TestCase):\n    def test_matching_provider_passes(self):\n        provider = {\"capabilities\": {\"json_mode\": True, \"tools\": True}, \"max_context_tokens\": 32768}\n        self.assertTrue(provider_matches_workload(provider, required=(\"json_mode\", \"tools\"), required_context_tokens=16000))\n\n    def test_missing_capability_and_context_are_reported(self):\n        provider = {\"capabilities\": {\"json_mode\": True}, \"max_context_tokens\": 4096}\n        self.assertEqual((\"capability_tools_is_required\", \"context_window_is_insufficient\"), provider_capability_violations(provider, required=(\"json_mode\", \"tools\"), required_context_tokens=8000))\n\n    def test_non_positive_requirement_is_rejected(self):\n        with self.assertRaises(ValueError):\n            provider_capability_violations({}, required=(), required_context_tokens=0)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Makes provider routing auditable and prevents capability or context-window mismatches without requiring live API access in CI.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm missing capabilities and insufficient context windows block provider selection.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

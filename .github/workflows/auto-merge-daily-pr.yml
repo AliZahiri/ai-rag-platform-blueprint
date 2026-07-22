@@ -36,4 +36,5 @@ jobs:
           GH_TOKEN: ${{ secrets.DAILY_AUTOMATION_TOKEN }}
           MERGE_METHOD: squash
           REQUIRE_CODE_CHANGE: "true"
+          REQUIRED_CHECK_NAMES: "python"
         run: bash .github/scripts/auto_merge_daily_prs.sh

@@ -4,6 +4,10 @@ set -euo pipefail
 REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 MERGE_METHOD="${MERGE_METHOD:-squash}"
 REQUIRE_CODE_CHANGE="${REQUIRE_CODE_CHANGE:-true}"
+REQUIRED_CHECK_NAMES="${REQUIRED_CHECK_NAMES:?REQUIRED_CHECK_NAMES is required}"
+CHECK_TIMEOUT_SECONDS="${CHECK_TIMEOUT_SECONDS:-900}"
+CHECK_POLL_SECONDS="${CHECK_POLL_SECONDS:-10}"
+CHECK_REGISTRATION_GRACE_SECONDS="${CHECK_REGISTRATION_GRACE_SECONDS:-10}"
 BASE_SHA="$(git rev-parse HEAD)"
 
 log() {
@@ -54,6 +58,41 @@ run_pr_tests() {
   git checkout --force FETCH_HEAD
   python -m unittest discover -s tests
   git checkout --force "$BASE_SHA"
+}
+
+wait_for_pr_checks() {
+  local pr="$1"
+  local deadline
+  local result
+  local status
+
+  log "PR #$pr: allowing ${CHECK_REGISTRATION_GRACE_SECONDS}s for check registration"
+  sleep "$CHECK_REGISTRATION_GRACE_SECONDS"
+  deadline=$((SECONDS + CHECK_TIMEOUT_SECONDS))
+
+  while (( SECONDS < deadline )); do
+    if result="$(
+      gh_retry pr view "$pr" --repo "$REPO" --json statusCheckRollup \
+        | python .github/scripts/check_gate.py \
+            --required "$REQUIRED_CHECK_NAMES"
+    )"; then
+      log "PR #$pr: $result"
+      return 0
+    else
+      status=$?
+    fi
+
+    if [[ "$status" -eq 2 ]]; then
+      log "PR #$pr skipped: $result"
+      return 1
+    fi
+
+    log "PR #$pr: $result; retrying in ${CHECK_POLL_SECONDS}s"
+    sleep "$CHECK_POLL_SECONDS"
+  done
+
+  log "PR #$pr skipped: required checks did not complete within ${CHECK_TIMEOUT_SECONDS}s"
+  return 1
 }
 
 merge_pr() {
@@ -111,6 +150,10 @@ main() {
 
     if [[ "$REQUIRE_CODE_CHANGE" == "true" ]] && is_docs_only "$pr"; then
       log "PR #$pr skipped: docs-only diff"
+      continue
+    fi
+
+    if ! wait_for_pr_checks "$pr"; then
       continue
     fi
 

@@ -597,6 +597,50 @@
     "portfolio_reason": "Makes provider routing auditable and prevents capability or context-window mismatches without requiring live API access in CI.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm missing capabilities and insufficient context windows block provider selection.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "opt-in-provider-liveness-probe",
+    "title": "Add opt-in provider liveness probe",
+    "files": [
+      {
+        "path": "docs/daily/opt-in-provider-liveness-probe.md",
+        "kind": "document",
+        "content": "Provider liveness checks must remain disabled by default so CI never makes paid or credential-bearing requests. The helper returns structured status, rejects endpoints containing user information, query strings, or fragments, bounds the timeout, and accepts an injected opener for deterministic tests. Operators must explicitly enable a probe and should target an unauthenticated health endpoint rather than a completion API."
+      },
+      {
+        "path": "scripts/provider_liveness_probe.py",
+        "content": "from __future__ import annotations\n\nfrom collections.abc import Callable\nfrom urllib.parse import urlsplit\nfrom urllib.request import Request, urlopen\n\n\ndef validate_probe_endpoint(endpoint: str) -> tuple[str, ...]:\n    parsed = urlsplit(endpoint)\n    violations: list[str] = []\n    if parsed.scheme not in {\"http\", \"https\"} or not parsed.hostname:\n        violations.append(\"http_endpoint_is_required\")\n    if parsed.username or parsed.password or parsed.query or parsed.fragment:\n        violations.append(\"endpoint_must_not_contain_credentials_or_parameters\")\n    return tuple(violations)\n\n\ndef probe_provider_liveness(endpoint: str, *, enabled: bool = False, timeout_seconds: float = 2.0, opener: Callable[..., object] = urlopen) -> dict[str, object]:\n    if not enabled:\n        return {\"status\": \"skipped\", \"reason\": \"probe_is_opt_in\"}\n    violations = validate_probe_endpoint(endpoint)\n    if violations:\n        return {\"status\": \"invalid\", \"violations\": violations}\n    if isinstance(timeout_seconds, bool) or not 0 < timeout_seconds <= 10:\n        raise ValueError(\"timeout must be greater than zero and at most ten seconds\")\n    request = Request(endpoint, method=\"HEAD\")\n    try:\n        response = opener(request, timeout=timeout_seconds)\n        status_code = int(getattr(response, \"status\", 0))\n    except Exception as error:\n        return {\"status\": \"unavailable\", \"error_type\": type(error).__name__}\n    return {\"status\": \"healthy\" if 200 <= status_code < 400 else \"unhealthy\", \"status_code\": status_code}\n"
+      },
+      {
+        "path": "tests/test_provider_liveness_probe.py",
+        "content": "import unittest\n\nfrom scripts.provider_liveness_probe import probe_provider_liveness, validate_probe_endpoint\n\n\nclass _Response:\n    status = 204\n\n\nclass ProviderLivenessProbeTests(unittest.TestCase):\n    def test_disabled_probe_never_calls_opener(self):\n        def fail_if_called(*args, **kwargs):\n            raise AssertionError(\"network opener must not be called\")\n\n        self.assertEqual({\"status\": \"skipped\", \"reason\": \"probe_is_opt_in\"}, probe_provider_liveness(\"https://provider.example/health\", opener=fail_if_called))\n\n    def test_enabled_probe_returns_structured_health(self):\n        result = probe_provider_liveness(\"https://provider.example/health\", enabled=True, opener=lambda request, timeout: _Response())\n        self.assertEqual({\"status\": \"healthy\", \"status_code\": 204}, result)\n\n    def test_credential_bearing_endpoint_is_rejected_without_network(self):\n        endpoint = \"https://token@provider.example/health?api_key=secret\"\n        self.assertIn(\"endpoint_must_not_contain_credentials_or_parameters\", validate_probe_endpoint(endpoint))\n        self.assertEqual(\"invalid\", probe_provider_liveness(endpoint, enabled=True).get(\"status\"))\n\n    def test_timeout_is_bounded(self):\n        with self.assertRaises(ValueError):\n            probe_provider_liveness(\"https://provider.example/health\", enabled=True, timeout_seconds=11)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Adds a production-oriented provider readiness signal while proving that default CI performs no provider calls and endpoint metadata cannot leak credentials.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm disabled probes make no network call while unsafe endpoints, bounded timeouts, and structured success are covered.",
+    "change_kind": "docs-and-code"
+  },
+  {
+    "id": "retrieval-domain-diversity-policy",
+    "title": "Add retrieval domain diversity policy",
+    "files": [
+      {
+        "path": "docs/daily/retrieval-domain-diversity-policy.md",
+        "kind": "document",
+        "content": "High-scoring chunks can still represent one publisher or document family. This deterministic policy measures distinct normalized source domains, ignores malformed sources, and requires an explicit minimum before a multi-source answer is treated as diverse. It complements score, deduplication, and citation checks without provider calls."
+      },
+      {
+        "path": "scripts/retrieval_domain_diversity.py",
+        "content": "from __future__ import annotations\n\nfrom urllib.parse import urlsplit\n\n\ndef distinct_source_domains(results: list[dict[str, object]]) -> tuple[str, ...]:\n    domains: list[str] = []\n    for result in results:\n        source_url = result.get(\"source_url\")\n        if not isinstance(source_url, str):\n            continue\n        host = (urlsplit(source_url).hostname or \"\").lower().rstrip(\".\")\n        if host and host not in domains:\n            domains.append(host)\n    return tuple(domains)\n\n\ndef retrieval_has_domain_diversity(results: list[dict[str, object]], *, minimum_domains: int = 2) -> bool:\n    if not isinstance(minimum_domains, int) or isinstance(minimum_domains, bool) or minimum_domains < 1:\n        raise ValueError(\"minimum domains must be a positive integer\")\n    return len(distinct_source_domains(results)) >= minimum_domains\n"
+      },
+      {
+        "path": "tests/test_retrieval_domain_diversity.py",
+        "content": "import unittest\n\nfrom scripts.retrieval_domain_diversity import distinct_source_domains, retrieval_has_domain_diversity\n\n\nclass RetrievalDomainDiversityTests(unittest.TestCase):\n    def test_distinct_domains_pass(self):\n        results = [{\"source_url\": \"https://docs.example/a\"}, {\"source_url\": \"https://standards.example/b\"}]\n        self.assertTrue(retrieval_has_domain_diversity(results))\n\n    def test_duplicate_and_case_variant_domains_are_collapsed(self):\n        results = [{\"source_url\": \"https://Docs.Example/a\"}, {\"source_url\": \"https://docs.example/b\"}]\n        self.assertEqual((\"docs.example\",), distinct_source_domains(results))\n        self.assertFalse(retrieval_has_domain_diversity(results))\n\n    def test_invalid_minimum_is_rejected(self):\n        with self.assertRaises(ValueError):\n            retrieval_has_domain_diversity([], minimum_domains=0)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Adds a measurable retrieval-quality control that limits single-source concentration before grounded answers are promoted.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm domain normalization, duplicate collapse, and invalid policy bounds are covered.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

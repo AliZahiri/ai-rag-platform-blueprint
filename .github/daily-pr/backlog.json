@@ -641,6 +641,50 @@
     "portfolio_reason": "Adds a measurable retrieval-quality control that limits single-source concentration before grounded answers are promoted.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm domain normalization, duplicate collapse, and invalid policy bounds are covered.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "rag-answer-release-gate",
+    "title": "Add RAG answer release gate",
+    "files": [
+      {
+        "path": "docs/daily/rag-answer-release-gate.md",
+        "kind": "document",
+        "content": "A grounded answer should not be released when retrieval confidence, evidence coverage, or source diversity fails independently. This aggregate gate reuses the existing deterministic policies and returns named violations suitable for API responses, evaluation reports, and CI fixtures without invoking an LLM provider."
+      },
+      {
+        "path": "scripts/rag_answer_release_gate.py",
+        "content": "from __future__ import annotations\n\nfrom scripts.retrieval_confidence import low_confidence_source_ids\nfrom scripts.retrieval_domain_diversity import retrieval_has_domain_diversity\nfrom scripts.retrieval_evidence_coverage import uncovered_claim_ids\n\n\ndef answer_release_violations(*, results: list[dict[str, object]], claim_ids: list[str] | tuple[str, ...], evidence_by_claim: dict[str, list[str]], minimum_score: float, minimum_domains: int) -> tuple[str, ...]:\n    violations: list[str] = []\n    low_confidence = low_confidence_source_ids(results, minimum_score=minimum_score)\n    if not results:\n        violations.append(\"retrieval_results_are_required\")\n    elif low_confidence:\n        violations.append(\"retrieval_confidence_gate_failed:\" + \",\".join(low_confidence))\n    uncovered = uncovered_claim_ids(claim_ids, evidence_by_claim)\n    if not claim_ids:\n        violations.append(\"claim_identifiers_are_required\")\n    elif uncovered:\n        violations.append(\"evidence_coverage_gate_failed:\" + \",\".join(uncovered))\n    if not retrieval_has_domain_diversity(results, minimum_domains=minimum_domains):\n        violations.append(\"retrieval_domain_diversity_gate_failed\")\n    return tuple(violations)\n\n\ndef answer_is_releasable(**inputs: object) -> bool:\n    return not answer_release_violations(**inputs)\n"
+      },
+      {
+        "path": "tests/test_rag_answer_release_gate.py",
+        "content": "import unittest\n\nfrom scripts.rag_answer_release_gate import answer_is_releasable, answer_release_violations\n\n\nclass RagAnswerReleaseGateTests(unittest.TestCase):\n    def test_confident_diverse_fully_grounded_answer_passes(self):\n        results = [{\"source_id\": \"s1\", \"source_url\": \"https://one.example/a\", \"score\": 0.9}, {\"source_id\": \"s2\", \"source_url\": \"https://two.example/b\", \"score\": 0.85}]\n        self.assertTrue(answer_is_releasable(results=results, claim_ids=[\"c1\"], evidence_by_claim={\"c1\": [\"s1\"]}, minimum_score=0.8, minimum_domains=2))\n\n    def test_quality_failures_are_reported_together(self):\n        results = [{\"source_id\": \"s1\", \"source_url\": \"https://one.example/a\", \"score\": 0.2}]\n        violations = answer_release_violations(results=results, claim_ids=[\"c1\"], evidence_by_claim={}, minimum_score=0.8, minimum_domains=2)\n        self.assertIn(\"retrieval_confidence_gate_failed:s1\", violations)\n        self.assertIn(\"evidence_coverage_gate_failed:c1\", violations)\n        self.assertIn(\"retrieval_domain_diversity_gate_failed\", violations)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Connects individual RAG quality validators into a release decision that can block weak or partially grounded answers.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm a confident, diverse, fully evidenced answer passes while combined quality failures remain observable.",
+    "change_kind": "docs-and-code"
+  },
+  {
+    "id": "provider-route-preflight-report",
+    "title": "Add provider route preflight report",
+    "files": [
+      {
+        "path": "docs/daily/provider-route-preflight-report.md",
+        "kind": "document",
+        "content": "Provider selection should expose one structured preflight report covering required capabilities, context-window fit, and configured token budget before any paid request. The report keeps routing failures machine-readable and operates only on declared metadata."
+      },
+      {
+        "path": "scripts/provider_route_preflight.py",
+        "content": "from __future__ import annotations\n\nfrom scripts.context_window_budget import context_budget_warnings\nfrom scripts.provider_capability_match import provider_capability_violations\n\n\ndef provider_route_preflight(provider: dict[str, object], *, required_capabilities: tuple[str, ...], required_context_tokens: int, prompt_tokens: int, completion_tokens: int, max_total_tokens: int) -> dict[str, object]:\n    violations = list(provider_capability_violations(provider, required=required_capabilities, required_context_tokens=required_context_tokens))\n    violations.extend(context_budget_warnings([prompt_tokens], max_context_tokens=max_total_tokens, reserved_output_tokens=completion_tokens))\n    return {\"eligible\": not violations, \"violations\": tuple(violations), \"estimated_total_tokens\": prompt_tokens + completion_tokens}\n"
+      },
+      {
+        "path": "tests/test_provider_route_preflight.py",
+        "content": "import unittest\n\nfrom scripts.provider_route_preflight import provider_route_preflight\n\n\nclass ProviderRoutePreflightTests(unittest.TestCase):\n    def test_matching_provider_within_budget_is_eligible(self):\n        provider = {\"capabilities\": {\"json_mode\": True}, \"max_context_tokens\": 16000}\n        report = provider_route_preflight(provider, required_capabilities=(\"json_mode\",), required_context_tokens=8000, prompt_tokens=1000, completion_tokens=500, max_total_tokens=2000)\n        self.assertTrue(report[\"eligible\"])\n        self.assertEqual(1500, report[\"estimated_total_tokens\"])\n\n    def test_capability_and_budget_failures_are_combined(self):\n        report = provider_route_preflight({\"capabilities\": {}, \"max_context_tokens\": 1000}, required_capabilities=(\"tools\",), required_context_tokens=8000, prompt_tokens=1000, completion_tokens=1000, max_total_tokens=1500)\n        self.assertFalse(report[\"eligible\"] )\n        self.assertGreaterEqual(len(report[\"violations\"]), 3)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Turns provider metadata policies into an auditable route selection report before latency or paid usage is incurred.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm capability, context, and token-budget violations are aggregated deterministically.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

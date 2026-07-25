@@ -685,6 +685,50 @@
     "portfolio_reason": "Turns provider metadata policies into an auditable route selection report before latency or paid usage is incurred.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm capability, context, and token-budget violations are aggregated deterministically.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "rag-evaluation-regression-gate",
+    "title": "Add RAG evaluation regression gate",
+    "files": [
+      {
+        "path": "docs/daily/rag-evaluation-regression-gate.md",
+        "kind": "document",
+        "content": "A RAG release should compare quality metrics with an accepted baseline instead of evaluating only absolute thresholds. This deterministic gate checks groundedness, citation precision, and answer relevance on a normalized zero-to-one scale, rejects missing or non-finite scores, and blocks regressions larger than an explicit budget. It consumes offline evaluation results and never requires provider calls."
+      },
+      {
+        "path": "scripts/rag_evaluation_regression.py",
+        "content": "from __future__ import annotations\n\nfrom math import isfinite\n\n\n_METRICS = (\"groundedness\", \"citation_precision\", \"answer_relevance\")\n\n\ndef _valid_score(value: object) -> bool:\n    return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(float(value)) and 0 <= float(value) <= 1\n\n\ndef evaluation_regression_violations(*, baseline: dict[str, object], candidate: dict[str, object], maximum_regression: float) -> tuple[str, ...]:\n    if not _valid_score(maximum_regression):\n        raise ValueError(\"maximum regression must be between zero and one\")\n    violations: list[str] = []\n    for metric in _METRICS:\n        baseline_score = baseline.get(metric)\n        candidate_score = candidate.get(metric)\n        if not _valid_score(baseline_score):\n            violations.append(f\"baseline:{metric}:score_must_be_between_zero_and_one\")\n            continue\n        if not _valid_score(candidate_score):\n            violations.append(f\"candidate:{metric}:score_must_be_between_zero_and_one\")\n            continue\n        if float(baseline_score) - float(candidate_score) > maximum_regression:\n            violations.append(f\"{metric}:regression_exceeds_budget\")\n    return tuple(violations)\n\n\ndef evaluation_regression_is_acceptable(**inputs: object) -> bool:\n    return not evaluation_regression_violations(**inputs)\n"
+      },
+      {
+        "path": "tests/test_rag_evaluation_regression.py",
+        "content": "import unittest\n\nfrom scripts.rag_evaluation_regression import evaluation_regression_is_acceptable, evaluation_regression_violations\n\n\nclass RagEvaluationRegressionTests(unittest.TestCase):\n    def test_candidate_within_regression_budget_passes(self):\n        baseline = {\"groundedness\": 0.90, \"citation_precision\": 0.85, \"answer_relevance\": 0.88}\n        candidate = {\"groundedness\": 0.87, \"citation_precision\": 0.86, \"answer_relevance\": 0.84}\n\n        self.assertTrue(evaluation_regression_is_acceptable(baseline=baseline, candidate=candidate, maximum_regression=0.05))\n\n    def test_multiple_quality_regressions_are_reported(self):\n        baseline = {\"groundedness\": 0.90, \"citation_precision\": 0.90, \"answer_relevance\": 0.90}\n        candidate = {\"groundedness\": 0.70, \"citation_precision\": 0.89, \"answer_relevance\": 0.60}\n\n        violations = evaluation_regression_violations(baseline=baseline, candidate=candidate, maximum_regression=0.05)\n\n        self.assertIn(\"groundedness:regression_exceeds_budget\", violations)\n        self.assertIn(\"answer_relevance:regression_exceeds_budget\", violations)\n\n    def test_missing_non_finite_and_invalid_budget_values_fail(self):\n        baseline = {\"groundedness\": 0.9, \"citation_precision\": 0.9, \"answer_relevance\": 0.9}\n        candidate = {\"groundedness\": float(\"nan\"), \"citation_precision\": 0.9}\n        violations = evaluation_regression_violations(baseline=baseline, candidate=candidate, maximum_regression=0.05)\n        self.assertIn(\"candidate:groundedness:score_must_be_between_zero_and_one\", violations)\n        self.assertIn(\"candidate:answer_relevance:score_must_be_between_zero_and_one\", violations)\n        with self.assertRaises(ValueError):\n            evaluation_regression_violations(baseline=baseline, candidate=baseline, maximum_regression=-0.1)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Adds an offline, provider-independent release control that detects measurable RAG quality regressions across groundedness, citation precision, and relevance.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm bounded regressions pass while excessive, missing, non-finite, or out-of-range evaluation scores fail deterministically.",
+    "change_kind": "docs-and-code"
+  },
+  {
+    "id": "citation-freshness-release-gate",
+    "title": "Add citation freshness release gate",
+    "files": [
+      {
+        "path": "docs/daily/citation-freshness-release-gate.md",
+        "kind": "document",
+        "content": "Traceable citations can still be unsafe to release when their source review is stale or status is unknown. This aggregate gate combines the existing source-identity and freshness policies, requires at least one citation, and prefixes freshness violations with a stable source identifier. It operates on retrieval metadata only and makes no network requests."
+      },
+      {
+        "path": "scripts/citation_freshness_release.py",
+        "content": "from __future__ import annotations\n\nfrom datetime import date\n\nfrom scripts.citation_source_ids import citation_source_warnings\nfrom scripts.source_freshness_policy import source_freshness_warnings\n\n\ndef citation_freshness_violations(sources: list[dict[str, object]], *, today: date, max_age_days: int = 180) -> tuple[str, ...]:\n    if max_age_days <= 0:\n        raise ValueError(\"maximum source age must be positive\")\n    violations: list[str] = []\n    if not sources:\n        violations.append(\"at_least_one_citation_source_is_required\")\n    violations.extend(citation_source_warnings(sources))\n    for index, source in enumerate(sources):\n        source_id = str(source.get(\"source_id\", \"\")).strip() or f\"source_{index}\"\n        violations.extend(f\"{source_id}:{warning}\" for warning in source_freshness_warnings(source, today=today, max_age_days=max_age_days))\n    return tuple(violations)\n\n\ndef citations_are_fresh_for_release(sources: list[dict[str, object]], *, today: date, max_age_days: int = 180) -> bool:\n    return not citation_freshness_violations(sources, today=today, max_age_days=max_age_days)\n"
+      },
+      {
+        "path": "tests/test_citation_freshness_release.py",
+        "content": "import unittest\nfrom datetime import date\n\nfrom scripts.citation_freshness_release import citation_freshness_violations, citations_are_fresh_for_release\n\n\nclass CitationFreshnessReleaseTests(unittest.TestCase):\n    def test_traceable_recent_sources_pass(self):\n        sources = [{\"source_id\": \"policy-1\", \"location\": \"s3://docs/policy.pdf\", \"status\": \"valid\", \"last_reviewed_at\": date(2026, 7, 1)}]\n\n        self.assertTrue(citations_are_fresh_for_release(sources, today=date(2026, 7, 25), max_age_days=90))\n\n    def test_identity_and_freshness_failures_are_partitioned(self):\n        sources = [{\"source_id\": \"\", \"location\": \"\", \"status\": \"unknown\", \"last_reviewed_at\": date(2025, 1, 1)}]\n\n        violations = citation_freshness_violations(sources, today=date(2026, 7, 25), max_age_days=90)\n\n        self.assertIn(\"citation_source_id_is_required\", violations)\n        self.assertIn(\"citation_source_location_is_required\", violations)\n        self.assertIn(\"source_0:source_status_unknown\", violations)\n        self.assertIn(\"source_0:source_review_is_stale\", violations)\n\n    def test_empty_sources_and_invalid_age_budget_fail(self):\n        self.assertEqual((\"at_least_one_citation_source_is_required\",), citation_freshness_violations([], today=date(2026, 7, 25)))\n        with self.assertRaises(ValueError):\n            citation_freshness_violations([], today=date(2026, 7, 25), max_age_days=0)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Connects citation traceability with review freshness so an answer cannot pass release checks using stale or unidentified evidence.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm recent traceable citations pass while empty, stale, unknown-status, duplicate, or unidentified sources fail with source-scoped violations.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

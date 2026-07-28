@@ -61,6 +61,14 @@ docker compose -f compose/docker-compose.yml --env-file .env up -d
 ./scripts/check-stack.sh
 ```
 
+Citation metadata can be checked with a deterministic release gate before an answer is exposed:
+
+```bash
+python3 scripts/citation_freshness_release.py citation-sources.json --today 2026-07-28 --max-age-days 90
+```
+
+The command prints a JSON report and exits non-zero when source identity, status, or review freshness fails.
+
 ## Production Notes
 
 - Pin all container images before production use.

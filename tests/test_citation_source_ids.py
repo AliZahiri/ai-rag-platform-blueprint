@@ -12,6 +12,12 @@ class CitationSourceIdTests(unittest.TestCase):
 
         self.assertIn("citation_source_ids_must_be_unique", warnings)
 
+    def test_non_string_identity_fields_are_missing(self):
+        warnings = citation_source_warnings([{"source_id": None, "location": 42}])
+
+        self.assertIn("citation_source_id_is_required", warnings)
+        self.assertIn("citation_source_location_is_required", warnings)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,22 @@ class SourceFreshnessPolicyTests(unittest.TestCase):
 
         self.assertIn("source_review_is_stale", warnings)
 
+    def test_future_review_date_is_rejected(self):
+        warnings = source_freshness_policy.source_freshness_warnings(
+            {"status": "valid", "last_reviewed_at": date(2026, 8, 1)},
+            today=date(2026, 7, 5),
+        )
+
+        self.assertEqual(("source_review_is_in_future",), warnings)
+
+    def test_age_budget_must_be_a_positive_integer(self):
+        with self.assertRaises(ValueError):
+            source_freshness_policy.source_freshness_warnings(
+                {"status": "valid", "last_reviewed_at": date(2026, 7, 1)},
+                today=date(2026, 7, 5),
+                max_age_days=True,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -773,6 +773,28 @@
     "portfolio_reason": "Adds deterministic observability guardrails for absolute token/cost overruns and relative usage growth without coupling CI to a live LLM provider.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm normal usage passes while absolute budget overruns, baseline growth anomalies, invalid observations, and invalid policy values fail.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "embedding-dimension-contract",
+    "title": "Add embedding dimension compatibility contract",
+    "files": [
+      {
+        "path": "docs/daily/embedding-dimension-contract.md",
+        "kind": "document",
+        "content": "Changing an embedding model without verifying its vector size can make an existing index unreadable or silently route writes to an incompatible collection. This offline contract validates unique route identities, non-empty provider and model metadata, positive integer dimensions, and exact agreement between model output and vector-index dimensions. It performs no provider calls and is safe for default CI."
+      },
+      {
+        "path": "scripts/embedding_dimension_contract.py",
+        "content": "from __future__ import annotations\n\n\ndef embedding_dimension_violations(bindings: list[dict[str, object]]) -> tuple[str, ...]:\n    if not bindings:\n        return (\"at_least_one_embedding_binding_is_required\",)\n    violations: list[str] = []\n    seen_routes: set[str] = set()\n    for index, binding in enumerate(bindings):\n        route = str(binding.get(\"route\", \"\")).strip()\n        if not route:\n            violations.append(f\"binding_{index}:route_is_required\")\n        elif route in seen_routes:\n            violations.append(f\"binding_{index}:route_must_be_unique\")\n        seen_routes.add(route)\n        for field in (\"provider\", \"model\", \"index\"):\n            if not str(binding.get(field, \"\")).strip():\n                violations.append(f\"binding_{index}:{field}_is_required\")\n        output_dimension = binding.get(\"output_dimension\")\n        index_dimension = binding.get(\"index_dimension\")\n        for field, value in ((\"output_dimension\", output_dimension), (\"index_dimension\", index_dimension)):\n            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:\n                violations.append(f\"binding_{index}:{field}_must_be_a_positive_integer\")\n        if (isinstance(output_dimension, int) and not isinstance(output_dimension, bool) and output_dimension > 0 and isinstance(index_dimension, int) and not isinstance(index_dimension, bool) and index_dimension > 0 and output_dimension != index_dimension):\n            violations.append(f\"binding_{index}:embedding_and_index_dimensions_must_match\")\n    return tuple(violations)\n\n\ndef embedding_bindings_are_compatible(bindings: list[dict[str, object]]) -> bool:\n    return not embedding_dimension_violations(bindings)\n"
+      },
+      {
+        "path": "tests/test_embedding_dimension_contract.py",
+        "content": "import unittest\n\nfrom scripts.embedding_dimension_contract import embedding_bindings_are_compatible, embedding_dimension_violations\n\n\nclass EmbeddingDimensionContractTests(unittest.TestCase):\n    def test_unique_complete_compatible_bindings_pass(self):\n        bindings = [{\"route\": \"documents\", \"provider\": \"local\", \"model\": \"embed-v2\", \"index\": \"documents-v2\", \"output_dimension\": 768, \"index_dimension\": 768}]\n        self.assertTrue(embedding_bindings_are_compatible(bindings))\n\n    def test_dimension_mismatch_and_duplicate_route_are_reported(self):\n        bindings = [{\"route\": \"documents\", \"provider\": \"local\", \"model\": \"embed-v2\", \"index\": \"documents-v2\", \"output_dimension\": 768, \"index_dimension\": 1536}, {\"route\": \"documents\", \"provider\": \"local\", \"model\": \"embed-v3\", \"index\": \"documents-v3\", \"output_dimension\": 1536, \"index_dimension\": 1536}]\n        violations = embedding_dimension_violations(bindings)\n        self.assertIn(\"binding_0:embedding_and_index_dimensions_must_match\", violations)\n        self.assertIn(\"binding_1:route_must_be_unique\", violations)\n\n    def test_empty_and_invalid_metadata_fail(self):\n        self.assertEqual((\"at_least_one_embedding_binding_is_required\",), embedding_dimension_violations([]))\n        violations = embedding_dimension_violations([{\"route\": \"\", \"provider\": \"\", \"model\": \"\", \"index\": \"\", \"output_dimension\": True, \"index_dimension\": 0}])\n        self.assertEqual(6, len(violations))\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Prevents incompatible embedding migrations from corrupting retrieval paths by making model-to-index vector dimensions explicit, deterministic, and reviewable without live provider access.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm compatible bindings pass while empty configuration, missing metadata, duplicate routes, invalid dimensions, and model/index mismatches fail.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

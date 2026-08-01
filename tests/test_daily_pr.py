@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,6 +24,11 @@ def sample_task():
 
 
 class DailyPrTests(unittest.TestCase):
+    def write_backlog(self, root, tasks):
+        backlog = Path(root) / "backlog.json"
+        backlog.write_text(json.dumps({"tasks": tasks}), encoding="utf-8")
+        return backlog
+
     def test_branch_name_uses_daily_prefix(self):
         self.assertEqual(daily_pr.branch_name({"id": "benchmark-plan"}), "daily/benchmark-plan")
 
@@ -51,6 +57,47 @@ class DailyPrTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             daily_pr.task_files(task)
+
+    def test_load_tasks_rejects_duplicate_task_ids(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tasks = [sample_task(), {**sample_task(), "target_file": "docs/other.md"}]
+
+            with self.assertRaisesRegex(ValueError, "duplicate task id: sample"):
+                daily_pr.load_tasks(self.write_backlog(tmpdir, tasks))
+
+    def test_load_tasks_rejects_duplicate_target_paths(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tasks = [sample_task(), {**sample_task(), "id": "other"}]
+
+            with self.assertRaisesRegex(ValueError, "duplicate incomplete task file path: docs/sample.md"):
+                daily_pr.load_tasks(self.write_backlog(tmpdir, tasks))
+
+    def test_load_tasks_allows_completed_task_path_to_be_evolved(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            target = root / "docs/sample.md"
+            target.parent.mkdir(parents=True)
+            target.write_text(daily_pr.task_marker("sample"), encoding="utf-8")
+            tasks = [sample_task(), {**sample_task(), "id": "follow-up"}]
+
+            loaded = daily_pr.load_tasks(self.write_backlog(tmpdir, tasks))
+
+            self.assertEqual(["sample", "follow-up"], [task["id"] for task in loaded])
+
+    def test_load_tasks_compile_checks_python_without_executing_it(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            task = {
+                **sample_task(),
+                "files": [
+                    {
+                        "path": "scripts/broken.py",
+                        "content": "raise RuntimeError('must not execute')\ndef broken(:\n",
+                    }
+                ],
+            }
+
+            with self.assertRaisesRegex(ValueError, "task sample has invalid Python in scripts/broken.py"):
+                daily_pr.load_tasks(self.write_backlog(tmpdir, [task]))
 
     def test_issue_body_includes_task_marker(self):
         rendered = daily_pr.issue_body(sample_task())

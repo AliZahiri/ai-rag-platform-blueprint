@@ -24,7 +24,7 @@ def retrieval_access_scope_violations(
         if record.get("tenant") != tenant:
             violations.append(f"record_{index}:tenant_must_match_request")
         scopes = record.get("scopes")
-        if not isinstance(scopes, list) or not all(isinstance(scope, str) and scope.strip() for scope in scopes):
+        if not isinstance(scopes, list) or not scopes or not all(isinstance(scope, str) and scope.strip() for scope in scopes):
             violations.append(f"record_{index}:scopes_must_be_a_non_empty_string_list")
         elif required_scope not in scopes:
             violations.append(f"record_{index}:required_scope_is_missing")

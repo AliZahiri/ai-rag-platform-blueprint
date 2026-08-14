@@ -13,7 +13,7 @@ class RetrievalIndexingFreshnessGateTests(unittest.TestCase):
         self.assertTrue(retrieval_indexing_is_fresh([RECORD], now=NOW))
 
     def test_duplicate_invalid_and_stale_records_fail(self):
-        stale = {**RECORD, "content_sha256": "bad", "source_updated_at": "2026-08-12T00:00:00Z", "indexed_at": "2026-08-13T00:00:00Z"}
+        stale = {**RECORD, "content_sha256": "bad", "source_updated_at": "2026-08-11T00:00:00Z", "indexed_at": "2026-08-13T00:00:00Z"}
         violations = retrieval_indexing_freshness_violations([stale, RECORD], now=NOW)
         self.assertIn("record_0:content_sha256_is_invalid", violations)
         self.assertIn("record_0:indexing_delay_exceeds_budget", violations)

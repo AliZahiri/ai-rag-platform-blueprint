@@ -1041,6 +1041,18 @@
     "portfolio_reason": "Demonstrates deterministic admission control for LLM context and output reservations before cost or latency reaches an external provider.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm valid requests pass while non-positive token values, context-window overflow, and route-budget overflow fail.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "rag-ingestion-source-manifest-contract",
+    "title": "Add RAG ingestion source manifest contract",
+    "files": [
+      {"path": "docs/daily/rag-ingestion-source-manifest-contract.md", "kind": "document", "content": "RAG ingestion should preserve a reviewable source manifest before embeddings are published. This offline contract validates a stable source identifier, a content digest, a timezone-aware retrieval timestamp, and a declared license so downstream retrieval and citation controls can reason about provenance without provider calls."},
+      {"path": "scripts/rag_ingestion_source_manifest.py", "content": "from __future__ import annotations\n\nfrom datetime import datetime\nimport re\n\n\n_SHA256 = re.compile(r\"[0-9a-f]{64}\\Z\")\n\n\ndef source_manifest_violations(manifest: dict[str, object]) -> tuple[str, ...]:\n    violations: list[str] = []\n    if not isinstance(manifest.get(\"source_id\"), str) or not manifest[\"source_id\"].strip():\n        violations.append(\"source_id_is_required\")\n    if not isinstance(manifest.get(\"content_sha256\"), str) or not _SHA256.fullmatch(manifest[\"content_sha256\"]):\n        violations.append(\"content_sha256_is_invalid\")\n    value = manifest.get(\"retrieved_at\")\n    try:\n        timestamp = datetime.fromisoformat(value.replace(\"Z\", \"+00:00\")) if isinstance(value, str) else None\n    except ValueError:\n        timestamp = None\n    if timestamp is None or timestamp.tzinfo is None or timestamp.utcoffset() is None:\n        violations.append(\"retrieved_at_must_be_timezone_aware\")\n    if not isinstance(manifest.get(\"license\"), str) or not manifest[\"license\"].strip():\n        violations.append(\"license_is_required\")\n    return tuple(violations)\n\n\ndef source_manifest_is_traceable(manifest: dict[str, object]) -> bool:\n    return not source_manifest_violations(manifest)\n"},
+      {"path": "tests/test_rag_ingestion_source_manifest.py", "content": "import unittest\n\nfrom scripts.rag_ingestion_source_manifest import source_manifest_is_traceable, source_manifest_violations\n\n\nclass RagIngestionSourceManifestContractTests(unittest.TestCase):\n    def test_traceable_manifest_passes(self):\n        self.assertTrue(source_manifest_is_traceable({\"source_id\": \"handbook-42\", \"content_sha256\": \"a\" * 64, \"retrieved_at\": \"2026-08-16T12:00:00Z\", \"license\": \"CC-BY-4.0\"}))\n\n    def test_incomplete_manifest_reports_each_violation(self):\n        violations = source_manifest_violations({\"source_id\": \" \", \"content_sha256\": \"bad\", \"retrieved_at\": \"2026-08-16T12:00:00\"})\n        self.assertEqual(violations, (\"source_id_is_required\", \"content_sha256_is_invalid\", \"retrieved_at_must_be_timezone_aware\", \"license_is_required\"))\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"}
+    ],
+    "portfolio_reason": "Extends RAG ingestion controls with deterministic provenance evidence that supports traceable retrieval, citations, and license review.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm only manifests with a source ID, SHA-256 digest, timezone-aware retrieval time, and license pass.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

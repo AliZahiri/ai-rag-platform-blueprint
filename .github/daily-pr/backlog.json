@@ -1053,6 +1053,18 @@
     "portfolio_reason": "Extends RAG ingestion controls with deterministic provenance evidence that supports traceable retrieval, citations, and license review.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm only manifests with a source ID, SHA-256 digest, timezone-aware retrieval time, and license pass.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "rag-source-license-allowlist-gate",
+    "title": "Add RAG source license allowlist gate",
+    "files": [
+      {"path": "docs/daily/rag-source-license-allowlist-gate.md", "kind": "document", "content": "RAG ingestion should reject sources whose license is missing, unapproved, or incompatible with the collection policy. This offline gate normalizes license identifiers, prevents duplicate source records, and keeps policy decisions reviewable without making provider calls."},
+      {"path": "scripts/rag_source_license_policy.py", "content": "from __future__ import annotations\n\n\ndef source_license_violations(sources: list[dict[str, object]], allowed_licenses: set[str]) -> tuple[str, ...]:\n    violations: list[str] = []\n    normalized_allowed = {license_id.strip().lower() for license_id in allowed_licenses if isinstance(license_id, str) and license_id.strip()}\n    if not normalized_allowed:\n        return (\"allowed_licenses_must_not_be_empty\",)\n    seen_ids: set[str] = set()\n    for index, source in enumerate(sources):\n        source_id = source.get(\"source_id\")\n        license_id = source.get(\"license\")\n        if not isinstance(source_id, str) or not source_id.strip():\n            violations.append(f\"source_{index}:source_id_is_required\")\n        elif source_id in seen_ids:\n            violations.append(f\"source_{index}:source_id_must_be_unique\")\n        else:\n            seen_ids.add(source_id)\n        if not isinstance(license_id, str) or license_id.strip().lower() not in normalized_allowed:\n            violations.append(f\"source_{index}:license_is_not_allowed\")\n    return tuple(violations)\n\n\ndef sources_have_allowed_licenses(sources: list[dict[str, object]], allowed_licenses: set[str]) -> bool:\n    return not source_license_violations(sources, allowed_licenses)\n"},
+      {"path": "tests/test_rag_source_license_policy.py", "content": "import unittest\n\nfrom scripts.rag_source_license_policy import source_license_violations, sources_have_allowed_licenses\n\n\nclass RagSourceLicenseAllowlistGateTests(unittest.TestCase):\n    def test_allowlisted_unique_sources_pass(self):\n        sources = [{\"source_id\": \"handbook\", \"license\": \"CC-BY-4.0\"}, {\"source_id\": \"runbook\", \"license\": \"Apache-2.0\"}]\n        self.assertTrue(sources_have_allowed_licenses(sources, {\"cc-by-4.0\", \"apache-2.0\"}))\n\n    def test_missing_duplicate_and_unapproved_licenses_fail(self):\n        violations = source_license_violations([{\"source_id\": \"handbook\", \"license\": \"Proprietary\"}, {\"source_id\": \"handbook\"}], {\"CC-BY-4.0\"})\n        self.assertEqual(violations, (\"source_0:license_is_not_allowed\", \"source_1:source_id_must_be_unique\", \"source_1:license_is_not_allowed\"))\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"}
+    ],
+    "portfolio_reason": "Adds a deterministic licensing control to RAG ingestion so provenance checks can block unreviewed content before it reaches retrieval.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm unique allowlisted sources pass while missing, duplicate, and unapproved licenses fail.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

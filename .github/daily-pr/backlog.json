@@ -1065,6 +1065,18 @@
     "portfolio_reason": "Adds a deterministic licensing control to RAG ingestion so provenance checks can block unreviewed content before it reaches retrieval.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm unique allowlisted sources pass while missing, duplicate, and unapproved licenses fail.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "rag-cost-anomaly-evidence-gate",
+    "title": "Add RAG provider cost anomaly evidence gate",
+    "files": [
+      {"path": "docs/daily/rag-cost-anomaly-evidence-gate.md", "kind": "document", "content": "Document an offline policy for comparing observed provider spend with a declared budget and flagging anomalous usage before release review."},
+      {"path": "scripts/rag_cost_anomaly.py", "content": "from __future__ import annotations\n\ndef cost_anomaly_violations(observation: dict[str, object], policy: dict[str, object]) -> tuple[str, ...]:\n    return ()\n"},
+      {"path": "tests/test_rag_cost_anomaly.py", "content": "import unittest\n\nclass RagCostAnomalyTests(unittest.TestCase):\n    def test_placeholder(self):\n        self.assertTrue(True)\n"}
+    ],
+    "portfolio_reason": "Adds a reviewable cost-control contract for provider fallback and token-budget operations.",
+    "test_instructions": "Run the unit test and expand it to cover missing, invalid, and anomalous spend observations.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

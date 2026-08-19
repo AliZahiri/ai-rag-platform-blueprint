@@ -2,7 +2,7 @@
 
 <!-- daily-pr-task: rag-cost-anomaly-evidence-gate -->
 
-Document an offline policy for comparing observed provider spend with a declared budget and flagging anomalous usage before release review.
+This offline gate requires a provider name, finite observed and baseline costs, and a timezone-aware timestamp. It rejects evidence above the daily spend cap, above the configured growth ratio, or recorded in the future.
 
 ## Portfolio Value
 
@@ -10,4 +10,4 @@ Adds a reviewable cost-control contract for provider fallback and token-budget o
 
 ## Validation
 
-Run the unit test and expand it to cover missing, invalid, and anomalous spend observations.
+Run python3 -m unittest discover -s tests. Tests cover compliant evidence, missing provider data, spend-cap and growth anomalies, future timestamps, and invalid policy or clock values.

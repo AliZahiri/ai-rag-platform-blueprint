@@ -1077,6 +1077,28 @@
     "portfolio_reason": "Adds a reviewable cost-control contract for provider fallback and token-budget operations.",
     "test_instructions": "Run the unit test and expand it to cover missing, invalid, and anomalous spend observations.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "rag-evaluation-privacy-evidence-gate",
+    "title": "Add RAG evaluation privacy evidence gate",
+    "files": [
+      {
+        "path": "docs/daily/rag-evaluation-privacy-evidence-gate.md",
+        "kind": "document",
+        "content": "Evaluation data can expose the same customer and sensitive information as production traffic. This offline gate validates evidence that an evaluation snapshot is identified, approved, scanned for sensitive data, redacted where required, and reviewed within a bounded age. It validates supplied metadata only and never contacts an LLM provider or reads the dataset itself."
+      },
+      {
+        "path": "scripts/rag_evaluation_privacy.py",
+        "content": "from __future__ import annotations\n\nfrom datetime import date, datetime, timedelta, timezone\n\n\ndef evaluation_privacy_violations(\n    evidence: dict[str, object], *, today: date, max_review_age_days: int = 90\n) -> tuple[str, ...]:\n    violations: list[str] = []\n    if not isinstance(max_review_age_days, int) or isinstance(max_review_age_days, bool) or max_review_age_days < 1:\n        return (\"max_review_age_days_must_be_positive\",)\n    for field in (\"dataset_id\", \"approved_by\"):\n        if not isinstance(evidence.get(field), str) or not evidence[field].strip():\n            violations.append(f\"{field}_is_required\")\n    if evidence.get(\"pii_scan_passed\") is not True:\n        violations.append(\"pii_scan_must_pass\")\n    if evidence.get(\"redaction_verified\") is not True:\n        violations.append(\"redaction_must_be_verified\")\n    reviewed_at = _parse_date(evidence.get(\"reviewed_at\"))\n    if reviewed_at is None:\n        violations.append(\"reviewed_at_must_be_an_iso_date\")\n    elif reviewed_at > today:\n        violations.append(\"reviewed_at_cannot_be_in_the_future\")\n    elif reviewed_at < today - timedelta(days=max_review_age_days):\n        violations.append(\"privacy_review_is_stale\")\n    return tuple(violations)\n\n\ndef evaluation_privacy_is_approved(\n    evidence: dict[str, object], *, today: date, max_review_age_days: int = 90\n) -> bool:\n    return not evaluation_privacy_violations(evidence, today=today, max_review_age_days=max_review_age_days)\n\n\ndef _parse_date(value: object) -> date | None:\n    if not isinstance(value, str):\n        return None\n    try:\n        return datetime.fromisoformat(value.replace(\"Z\", \"+00:00\")).astimezone(timezone.utc).date()\n    except ValueError:\n        return None\n"
+      },
+      {
+        "path": "tests/test_rag_evaluation_privacy.py",
+        "content": "import unittest\nfrom datetime import date\n\nfrom scripts.rag_evaluation_privacy import evaluation_privacy_is_approved, evaluation_privacy_violations\n\n\nclass RagEvaluationPrivacyEvidenceGateTests(unittest.TestCase):\n    def test_recent_approved_privacy_evidence_passes(self):\n        evidence = {\"dataset_id\": \"eval-2026-08\", \"approved_by\": \"privacy-reviewer\", \"pii_scan_passed\": True, \"redaction_verified\": True, \"reviewed_at\": \"2026-08-01\"}\n        self.assertTrue(evaluation_privacy_is_approved(evidence, today=date(2026, 8, 20)))\n\n    def test_missing_controls_and_stale_review_are_reported(self):\n        violations = evaluation_privacy_violations({\"dataset_id\": \"\", \"approved_by\": \"\", \"pii_scan_passed\": False, \"redaction_verified\": False, \"reviewed_at\": \"2026-01-01\"}, today=date(2026, 8, 20), max_review_age_days=30)\n        self.assertEqual(violations, (\"dataset_id_is_required\", \"approved_by_is_required\", \"pii_scan_must_pass\", \"redaction_must_be_verified\", \"privacy_review_is_stale\"))\n\n    def test_invalid_policy_and_future_review_fail(self):\n        violations = evaluation_privacy_violations({\"dataset_id\": \"eval\", \"approved_by\": \"reviewer\", \"pii_scan_passed\": True, \"redaction_verified\": True, \"reviewed_at\": \"2026-08-21\"}, today=date(2026, 8, 20), max_review_age_days=0)\n        self.assertEqual(violations, (\"max_review_age_days_must_be_positive\",))\n"
+      }
+    ],
+    "portfolio_reason": "Makes evaluation governance credible by requiring privacy-review evidence without placing customer data or provider calls in CI.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests`; confirm a recent approved snapshot passes and missing privacy controls, stale reviews, invalid policies, or future review dates fail deterministically.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

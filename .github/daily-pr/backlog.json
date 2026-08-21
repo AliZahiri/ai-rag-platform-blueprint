@@ -1123,6 +1123,28 @@
     "portfolio_reason": "Makes retrieval-cache safety explicit through bounded lifetimes and evidence that sensitive entries are not served from cache.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm valid cache entries require a bounded TTL, timezone-aware timestamp, and non-sensitive classification.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "retrieval-cache-access-boundary-gate",
+    "title": "Add retrieval cache access-boundary gate",
+    "files": [
+      {
+        "path": "docs/daily/retrieval-cache-access-boundary-gate.md",
+        "kind": "document",
+        "content": "A retrieval cache key must be bound to the requesting tenant and authorization scope. This offline gate validates cache metadata before reuse so a response cached for one tenant or scope cannot be served to another. It validates supplied evidence only and makes no provider calls."
+      },
+      {
+        "path": "scripts/retrieval_cache_access_boundary.py",
+        "content": "from __future__ import annotations\n\n\ndef retrieval_cache_access_violations(\n    entry: dict[str, object], *, tenant: str, required_scope: str\n) -> tuple[str, ...]:\n    if not isinstance(tenant, str) or not tenant.strip():\n        raise ValueError(\"tenant must be a non-empty string\")\n    if not isinstance(required_scope, str) or not required_scope.strip():\n        raise ValueError(\"required_scope must be a non-empty string\")\n\n    violations: list[str] = []\n    if not isinstance(entry.get(\"cache_key\"), str) or not entry[\"cache_key\"].strip():\n        violations.append(\"cache_key_is_required\")\n    if entry.get(\"tenant\") != tenant:\n        violations.append(\"cache_tenant_must_match_request\")\n    scopes = entry.get(\"scopes\")\n    if not isinstance(scopes, list) or not scopes or not all(\n        isinstance(scope, str) and scope.strip() for scope in scopes\n    ):\n        violations.append(\"cache_scopes_must_be_a_non_empty_string_list\")\n    elif required_scope not in scopes:\n        violations.append(\"required_scope_is_missing_from_cache_entry\")\n    if entry.get(\"access_decision\") != \"granted\":\n        violations.append(\"cache_access_must_be_granted\")\n    return tuple(violations)\n\n\ndef retrieval_cache_access_is_safe(\n    entry: dict[str, object], *, tenant: str, required_scope: str\n) -> bool:\n    return not retrieval_cache_access_violations(\n        entry, tenant=tenant, required_scope=required_scope\n    )\n"
+      },
+      {
+        "path": "tests/test_retrieval_cache_access_boundary.py",
+        "content": "import unittest\n\nfrom scripts.retrieval_cache_access_boundary import (\n    retrieval_cache_access_is_safe,\n    retrieval_cache_access_violations,\n)\n\n\nclass RetrievalCacheAccessBoundaryGateTests(unittest.TestCase):\n    def test_cache_entry_bound_to_request_tenant_and_scope_passes(self):\n        entry = {\n            \"cache_key\": \"acme:handbook:42\",\n            \"tenant\": \"acme\",\n            \"scopes\": [\"knowledge.read\"],\n            \"access_decision\": \"granted\",\n        }\n\n        self.assertTrue(\n            retrieval_cache_access_is_safe(\n                entry, tenant=\"acme\", required_scope=\"knowledge.read\"\n            )\n        )\n\n    def test_cross_tenant_or_unapproved_cache_entry_fails(self):\n        violations = retrieval_cache_access_violations(\n            {\n                \"cache_key\": \"\",\n                \"tenant\": \"other\",\n                \"scopes\": [\"profile.read\"],\n                \"access_decision\": \"denied\",\n            },\n            tenant=\"acme\",\n            required_scope=\"knowledge.read\",\n        )\n\n        self.assertEqual(\n            violations,\n            (\n                \"cache_key_is_required\",\n                \"cache_tenant_must_match_request\",\n                \"required_scope_is_missing_from_cache_entry\",\n                \"cache_access_must_be_granted\",\n            ),\n        )\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+      }
+    ],
+    "portfolio_reason": "Extends retrieval safety beyond TTL validation by binding reusable cache entries to the tenant and authorization scope that produced them, reducing cross-tenant data exposure risk.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm only cache metadata bound to the requested tenant, scope, and granted authorization passes.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

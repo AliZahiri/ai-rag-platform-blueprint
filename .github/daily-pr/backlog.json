@@ -1145,6 +1145,18 @@
     "portfolio_reason": "Extends retrieval safety beyond TTL validation by binding reusable cache entries to the tenant and authorization scope that produced them, reducing cross-tenant data exposure risk.",
     "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm only cache metadata bound to the requested tenant, scope, and granted authorization passes.",
     "change_kind": "docs-and-code"
+  },
+  {
+    "id": "retention-policy-cli-fixture-gate",
+    "title": "Add retention policy CLI fixture gate",
+    "files": [
+      {"path": "docs/daily/retention-policy-cli-fixture-gate.md", "kind": "document", "content": "Add a committed, non-sensitive example policy and a deterministic CLI contract test so teams can adopt the retention gate in CI without embedding real retention records."},
+      {"path": "examples/retention-policy.example.json", "content": "{\n  \"user_history_days\": 90,\n  \"operational_log_days\": 30,\n  \"anonymization_required\": true,\n  \"backup_retention_days\": 14,\n  \"support_access_scope\": \"case-by-case approval\"\n}\n"},
+      {"path": "tests/test_retention_policy_example.py", "content": "import json\nimport subprocess\nimport sys\nimport unittest\nfrom pathlib import Path\n\n\nROOT = Path(__file__).resolve().parents[1]\n\n\nclass RetentionPolicyExampleTests(unittest.TestCase):\n    def test_example_passes_the_cli_gate(self):\n        result = subprocess.run([sys.executable, \"scripts/chat_retention_policy_gate.py\", \"examples/retention-policy.example.json\"], cwd=ROOT, text=True, capture_output=True, check=False)\n        self.assertEqual(result.returncode, 0)\n        self.assertTrue(json.loads(result.stdout)[\"ok\"])\n"}
+    ],
+    "portfolio_reason": "Makes the executable retention-policy release gate directly reproducible in CI without committing organizational or customer data.",
+    "test_instructions": "Run `python3 -m unittest discover -s tests` and confirm the public example emits a passing JSON report.",
+    "change_kind": "docs-and-code"
   }
 ]
 }

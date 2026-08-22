@@ -1,0 +1,7 @@
+{
+  "user_history_days": 90,
+  "operational_log_days": 30,
+  "anonymization_required": true,
+  "backup_retention_days": 14,
+  "support_access_scope": "case-by-case approval"
+}

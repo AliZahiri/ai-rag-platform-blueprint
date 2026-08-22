@@ -69,6 +69,15 @@ python3 scripts/citation_freshness_release.py citation-sources.json --today 2026
 
 The command prints a JSON report and exits non-zero when source identity, status, or review freshness fails.
 
+Chat-history retention policies can use the same offline release-gate approach:
+
+```bash
+python3 scripts/chat_retention_policy_gate.py retention-policy.json
+```
+
+See [the retention policy gate](docs/chat-retention-policy-gate.md) for its JSON
+contract, deterministic output, and CI use.
+
 ## Production Notes
 
 - Pin all container images before production use.

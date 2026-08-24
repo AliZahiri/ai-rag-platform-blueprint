@@ -8,7 +8,6 @@ REQUIRED_CHECK_NAMES="${REQUIRED_CHECK_NAMES:?REQUIRED_CHECK_NAMES is required}"
 CHECK_TIMEOUT_SECONDS="${CHECK_TIMEOUT_SECONDS:-900}"
 CHECK_POLL_SECONDS="${CHECK_POLL_SECONDS:-10}"
 CHECK_REGISTRATION_GRACE_SECONDS="${CHECK_REGISTRATION_GRACE_SECONDS:-10}"
-BASE_SHA="$(git rev-parse HEAD)"
 
 log() {
   printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*" >&2
@@ -52,13 +51,32 @@ linked_issue_number() {
     | grep -Eo '[0-9]+' || true
 }
 
-run_pr_tests() {
+run_pr_tests() (
+  set -euo pipefail
   local head="$1"
+  local temp_root
+  local worktree
+
+  temp_root="$(mktemp -d)"
+  worktree="$temp_root/pr-head"
+
+  cleanup_test_worktree() {
+    if [[ -d "$worktree" ]] && ! git worktree remove "$worktree" >/dev/null 2>&1; then
+      log "Unable to remove temporary PR test worktree: $worktree"
+    fi
+    if [[ -d "$temp_root" ]] && ! rmdir "$temp_root" >/dev/null 2>&1; then
+      log "Unable to remove temporary PR test directory: $temp_root"
+    fi
+  }
+  trap cleanup_test_worktree EXIT
+
   git fetch --no-tags origin "$head"
-  git checkout --force FETCH_HEAD
-  python -m unittest discover -s tests
-  git checkout --force "$BASE_SHA"
-}
+  git worktree add --detach "$worktree" FETCH_HEAD
+  (
+    cd "$worktree"
+    PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests
+  )
+)
 
 wait_for_pr_checks() {
   local pr="$1"
@@ -171,4 +189,6 @@ main() {
   done <<< "$prs"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

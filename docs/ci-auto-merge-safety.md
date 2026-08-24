@@ -9,3 +9,5 @@ Daily portfolio pull requests are eligible for squash merge only after three ind
 `REQUIRED_CHECK_NAMES` in `.github/workflows/auto-merge-daily-pr.yml` is the explicit check contract. The gate waits for GitHub to register pull-request checks, polls their check-run state for up to 15 minutes, and refuses merge on failure or timeout. Checks attached only to another pull request cannot satisfy the gate.
 
 If a validation job is renamed or added as a merge prerequisite, update `REQUIRED_CHECK_NAMES` in the same pull request. A failed or timed-out gate leaves the PR and linked issue open for diagnosis; it does not bypass validation.
+
+The independent test rerun uses a detached temporary Git worktree at the fetched PR head. The auto-merge checkout remains on its original commit, and an exit trap removes the temporary worktree after success or failure. This keeps PR code and generated test artifacts isolated from the merge-control workspace.

@@ -7,9 +7,16 @@ from pathlib import Path
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / ".github/scripts/auto_merge_daily_prs.sh"
+WORKFLOW_PATH = Path(__file__).resolve().parents[1] / ".github/workflows/auto-merge-daily-pr.yml"
 
 
 class AutoMergeWorktreeTests(unittest.TestCase):
+    def test_workflow_rebases_to_preserve_generated_commit_author(self):
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("MERGE_METHOD: rebase", workflow)
+        self.assertNotIn("MERGE_METHOD: squash", workflow)
+
     def git(self, cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["git", *args],

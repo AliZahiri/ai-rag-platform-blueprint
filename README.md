@@ -78,6 +78,23 @@ python3 scripts/chat_retention_policy_gate.py retention-policy.json
 See [the retention policy gate](docs/chat-retention-policy-gate.md) for its JSON
 contract, deterministic output, and CI use.
 
+## Offline Release Gates
+
+The repository includes executable, provider-free gates for CI and release
+workflows. They validate configuration or supplied evidence without contacting a
+model provider by default.
+
+| Gate | Entry point | Operational decision |
+| --- | --- | --- |
+| LiteLLM route preflight | `scripts/litellm_preflight.py` | Route, fallback, capability, secret-reference, and observability readiness |
+| Citation freshness | `scripts/citation_freshness_release.py` | Whether cited sources are identifiable and recently reviewed |
+| Chat retention | `scripts/chat_retention_policy_gate.py` | Whether retention policy fields and review controls are complete |
+| Vector backup coverage | `scripts/rag_backup_plan.py` | Whether backup targets and restore checks cover the RAG data plane |
+| Index replica consistency | `scripts/index_replica_consistency.py` | Whether fresh replicas match the approved generation, count, and digest |
+
+Each command documents its arguments through `--help`; the related operational
+contracts live under `docs/`. Provider liveness remains explicitly opt-in.
+
 ## Production Notes
 
 - Pin all container images before production use.
@@ -98,8 +115,9 @@ contract, deterministic output, and CI use.
 
 ## Next Iterations
 
-- Add Kong or Nginx gateway examples
-- Add LiteLLM config examples
-- Add vLLM GPU node runbook
-- Add backup and restore runbooks
-- Add benchmark plan for model and GPU sizing
+- Consolidate the standalone policy modules behind versioned JSON schemas and a
+  unified release-check command.
+- Add opt-in evidence collectors for LiteLLM, the vector store, and Prometheus
+  while keeping default CI provider-free.
+- Pin default container references by digest and document the upgrade workflow.
+- Turn the current GPU and vector-restore guidance into runnable drill examples.

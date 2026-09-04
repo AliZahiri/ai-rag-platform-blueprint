@@ -1,13 +1,26 @@
 from __future__ import annotations
 
-from datetime import datetime
+import argparse
+from datetime import datetime, timezone
+import json
+from pathlib import Path
 import re
+import sys
 
 
 _SHA256 = re.compile(r"(?:sha256:)?[0-9a-f]{64}\Z")
 
 
-def index_replica_consistency_violations(replicas: list[dict[str, object]], *, expected_generation: str, expected_document_count: int, expected_sha256: str, now: datetime, minimum_replicas: int = 2, maximum_age_seconds: int = 900) -> tuple[str, ...]:
+def index_replica_consistency_violations(
+    replicas: list[object],
+    *,
+    expected_generation: str,
+    expected_document_count: int,
+    expected_sha256: str,
+    now: datetime,
+    minimum_replicas: int = 2,
+    maximum_age_seconds: int = 900,
+) -> tuple[str, ...]:
     if not isinstance(expected_generation, str) or not expected_generation.strip():
         raise ValueError("expected_generation must be non-empty")
     if not isinstance(expected_document_count, int) or isinstance(expected_document_count, bool) or expected_document_count < 0:
@@ -49,7 +62,7 @@ def index_replica_consistency_violations(replicas: list[dict[str, object]], *, e
     return tuple(violations)
 
 
-def index_replicas_are_consistent(replicas: list[dict[str, object]], **policy: object) -> bool:
+def index_replicas_are_consistent(replicas: list[object], **policy: object) -> bool:
     return not index_replica_consistency_violations(replicas, **policy)
 
 
@@ -61,3 +74,66 @@ def _timestamp(value: object) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo is not None and parsed.utcoffset() is not None else None
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate vector index replica consistency evidence."
+    )
+    parser.add_argument("evidence", type=Path, help="JSON evidence file")
+    parser.add_argument("--expected-generation", required=True)
+    parser.add_argument("--expected-document-count", required=True, type=int)
+    parser.add_argument("--expected-sha256", required=True)
+    parser.add_argument(
+        "--now",
+        help="ISO-8601 policy evaluation time; defaults to the current UTC time",
+    )
+    parser.add_argument("--minimum-replicas", type=int, default=2)
+    parser.add_argument("--maximum-age-seconds", type=int, default=900)
+    return parser.parse_args(argv)
+
+
+def _load_replicas(path: Path) -> list[object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("evidence must be a JSON object")
+    replicas = payload.get("replicas")
+    if not isinstance(replicas, list):
+        raise ValueError("evidence.replicas must be a JSON array")
+    return replicas
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    try:
+        replicas = _load_replicas(args.evidence)
+        now = datetime.now(timezone.utc) if args.now is None else _timestamp(args.now)
+        if now is None:
+            raise ValueError("now must be a timezone-aware ISO-8601 timestamp")
+        violations = index_replica_consistency_violations(
+            replicas,
+            expected_generation=args.expected_generation,
+            expected_document_count=args.expected_document_count,
+            expected_sha256=args.expected_sha256,
+            now=now,
+            minimum_replicas=args.minimum_replicas,
+            maximum_age_seconds=args.maximum_age_seconds,
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(json.dumps({"error": str(exc), "status": "error"}), file=sys.stderr)
+        return 2
+
+    report = {
+        "expected_document_count": args.expected_document_count,
+        "expected_generation": args.expected_generation,
+        "minimum_replicas": args.minimum_replicas,
+        "replica_count": len(replicas),
+        "status": "pass" if not violations else "fail",
+        "violations": list(violations),
+    }
+    print(json.dumps(report, sort_keys=True))
+    return 0 if not violations else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

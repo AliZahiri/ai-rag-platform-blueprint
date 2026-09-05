@@ -1,0 +1,79 @@
+{
+  "$schema": "../schemas/rag-release-check-manifest.v1.schema.json",
+  "schema_version": 1,
+  "checks": [
+    {
+      "id": "routes",
+      "gate": "litellm-preflight",
+      "args": [
+        "--config",
+        "../configs/litellm-routes.example.json",
+        "--json"
+      ]
+    },
+    {
+      "id": "citations",
+      "gate": "citation-freshness",
+      "args": [
+        "citation-sources.example.json",
+        "--today",
+        "2026-09-05",
+        "--max-age-days",
+        "30"
+      ]
+    },
+    {
+      "id": "retention",
+      "gate": "chat-retention",
+      "args": [
+        "retention-policy.example.json"
+      ]
+    },
+    {
+      "id": "vector-backup",
+      "gate": "vector-backup",
+      "args": [
+        "--target",
+        "vector_collections",
+        "--target",
+        "source_documents",
+        "--target",
+        "collection_metadata",
+        "--target",
+        "parser_config",
+        "--target",
+        "embedding_model_metadata",
+        "--target",
+        "collection_schema",
+        "--target",
+        "index_settings",
+        "--check",
+        "collection_exists",
+        "--check",
+        "collection_schema_matches",
+        "--check",
+        "source_document_count_matches",
+        "--check",
+        "sample_similarity_query",
+        "--check",
+        "embedding_model_metadata_matches",
+        "--json"
+      ]
+    },
+    {
+      "id": "index-replicas",
+      "gate": "index-replica-consistency",
+      "args": [
+        "index-replicas.example.json",
+        "--expected-generation",
+        "generation-42",
+        "--expected-document-count",
+        "1200",
+        "--expected-sha256",
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--now",
+        "2026-09-05T09:00:00Z"
+      ]
+    }
+  ]
+}

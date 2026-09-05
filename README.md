@@ -78,6 +78,16 @@ python3 scripts/chat_retention_policy_gate.py retention-policy.json
 See [the retention policy gate](docs/chat-retention-policy-gate.md) for its JSON
 contract, deterministic output, and CI use.
 
+Run the core offline gates together from a reviewed, versioned manifest:
+
+```bash
+python3 scripts/rag_release_check.py examples/release-checks.example.json
+```
+
+The command emits one aggregate JSON report and preserves the distinction
+between a policy rejection and an execution or manifest error. See the
+[unified release-check contract](docs/rag-release-check.md).
+
 ## Offline Release Gates
 
 The repository includes executable, provider-free gates for CI and release
@@ -91,6 +101,7 @@ model provider by default.
 | Chat retention | `scripts/chat_retention_policy_gate.py` | Whether retention policy fields and review controls are complete |
 | Vector backup coverage | `scripts/rag_backup_plan.py` | Whether backup targets and restore checks cover the RAG data plane |
 | Index replica consistency | `scripts/index_replica_consistency.py` | Whether fresh replicas match the approved generation, count, and digest |
+| Unified release check | `scripts/rag_release_check.py` | Whether every gate selected by a versioned, allowlisted manifest passes |
 
 Each command documents its arguments through `--help`; the related operational
 contracts live under `docs/`. Provider liveness remains explicitly opt-in.
@@ -115,8 +126,8 @@ contracts live under `docs/`. Provider liveness remains explicitly opt-in.
 
 ## Next Iterations
 
-- Consolidate the standalone policy modules behind versioned JSON schemas and a
-  unified release-check command.
+- Extend the versioned release-check manifest to additional evaluation and
+  response-safety gates.
 - Add opt-in evidence collectors for LiteLLM, the vector store, and Prometheus
   while keeping default CI provider-free.
 - Pin default container references by digest and document the upgrade workflow.

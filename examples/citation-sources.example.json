@@ -1,0 +1,8 @@
+[
+  {
+    "source_id": "platform-runbook",
+    "location": "s3://knowledge-base/runbooks/platform.md",
+    "status": "valid",
+    "last_reviewed_at": "2026-09-01"
+  }
+]

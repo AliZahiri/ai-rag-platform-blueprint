@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import sys
@@ -86,8 +87,13 @@ def validate_limits(alias: str, limits: Any) -> list[str]:
         return [f"{alias}: limits must be an object"]
     for key in REQUIRED_LIMITS:
         value = limits.get(key)
-        if not isinstance(value, (int, float)) or value < 0:
-            errors.append(f"{alias}: limits.{key} must be a non-negative number")
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or (isinstance(value, float) and not math.isfinite(value))
+            or value < 0
+        ):
+            errors.append(f"{alias}: limits.{key} must be a finite non-negative number")
     if limits.get("rpm", 0) == 0:
         errors.append(f"{alias}: limits.rpm must be greater than zero")
     if limits.get("tpm", 0) == 0:

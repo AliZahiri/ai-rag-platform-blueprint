@@ -18,6 +18,12 @@ Required checks:
 - capabilities required by the RAG stack are available: streaming, tool calling, JSON mode, and enough context window
 - observability fields are enabled for latency, token usage, cost, and failures
 
+All route limits must be finite, non-negative numbers. Booleans, `NaN`, infinity,
+and JSON numbers that overflow to infinity (such as `1e309`) are rejected.
+RPM, TPM, and timeout must be greater than zero; retries and cost cap may be zero.
+Fractional timeouts and costs remain supported. Invalid limits make both the
+standalone preflight and the unified release check reject the configuration.
+
 ## Free Dry-Run
 
 Use the helper without secret checking in public CI or local documentation checks:

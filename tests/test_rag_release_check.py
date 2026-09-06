@@ -116,6 +116,51 @@ class ReleaseCheckRunnerTests(unittest.TestCase):
         self.assertEqual("litellm_preflight.py", Path(command[1]).name)
         self.assertNotIn("shell", runner.call_args.kwargs)
 
+    def test_invalid_route_limit_rejects_release_and_keeps_other_results(self):
+        valid_config_path = ROOT / "configs" / "litellm-routes.example.json"
+        config = json.loads(valid_config_path.read_text(encoding="utf-8"))
+        config["routes"][0]["limits"]["cost_cap_usd"] = True
+        with tempfile.TemporaryDirectory() as temp_directory:
+            config_path = Path(temp_directory) / "routes.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            manifest_path = Path(temp_directory) / "release-checks.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "checks": [
+                            {
+                                "id": "invalid-routes",
+                                "gate": "litellm-preflight",
+                                "args": ["--config", "routes.json", "--json"],
+                            },
+                            {
+                                "id": "valid-routes",
+                                "gate": "litellm-preflight",
+                                "args": ["--config", str(valid_config_path), "--json"],
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main([str(manifest_path)])
+
+        report = json.loads(output.getvalue())
+        self.assertEqual(1, exit_code)
+        self.assertEqual("fail", report["status"])
+        self.assertEqual(
+            {"errors": 0, "failed": 1, "passed": 1, "total": 2},
+            report["summary"],
+        )
+        self.assertIn(
+            "rag-default: limits.cost_cap_usd must be a finite non-negative number",
+            report["checks"][0]["report"]["errors"],
+        )
+        self.assertEqual("pass", report["checks"][1]["status"])
+
     def test_invalid_manifest_returns_structured_error(self):
         with tempfile.TemporaryDirectory() as temp_directory:
             manifest_path = Path(temp_directory) / "release-checks.json"

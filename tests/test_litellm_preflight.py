@@ -68,6 +68,44 @@ class LiteLlmPreflightTests(unittest.TestCase):
 
         self.assertEqual(validate_config(config), [])
 
+    def test_route_limits_reject_non_finite_and_non_numeric_values(self):
+        for key in VALID_CONFIG["routes"][0]["limits"]:
+            for value in (float("nan"), float("inf"), float("-inf"), True, False, -1, "1", None):
+                with self.subTest(limit=key, value=value):
+                    config = copy.deepcopy(VALID_CONFIG)
+                    config["routes"][0]["limits"][key] = value
+
+                    errors = validate_config(config)
+
+                    self.assertIn(
+                        f"rag-default: limits.{key} must be a finite non-negative number",
+                        errors,
+                    )
+
+    def test_route_limit_zero_boundaries_are_preserved(self):
+        for key in VALID_CONFIG["routes"][0]["limits"]:
+            with self.subTest(limit=key):
+                config = copy.deepcopy(VALID_CONFIG)
+                config["routes"][0]["limits"][key] = 0
+
+                errors = validate_config(config)
+
+                if key in ("rpm", "tpm", "timeout_seconds"):
+                    self.assertEqual(
+                        [f"rag-default: limits.{key} must be greater than zero"],
+                        errors,
+                    )
+                else:
+                    self.assertEqual([], errors)
+
+    def test_finite_route_limits_preserve_fractional_and_large_values(self):
+        config = copy.deepcopy(VALID_CONFIG)
+        config["routes"][0]["limits"].update(
+            {"tpm": 10**400, "timeout_seconds": 0.5, "cost_cap_usd": 0.01}
+        )
+
+        self.assertEqual([], validate_config(config))
+
     def test_missing_secret_is_reported_only_when_required(self):
         config = copy.deepcopy(VALID_CONFIG)
         original = os.environ.pop("OPENAI_API_KEY", None)
@@ -204,6 +242,39 @@ class LiteLlmPreflightTests(unittest.TestCase):
 
         self.assertTrue(json.loads(result.stdout)["live_probe_requested"])
         self.assertEqual(result.stdout.count("\n"), 1)
+
+    def test_json_cli_rejects_invalid_numeric_cost_caps(self):
+        for literal in ("NaN", "Infinity", "1e309", "true", "false"):
+            with self.subTest(cost_cap=literal), tempfile.TemporaryDirectory() as temp_dir:
+                config_path = Path(temp_dir) / "invalid.json"
+                config_path.write_text(
+                    json.dumps(VALID_CONFIG).replace(
+                        '"cost_cap_usd": 25.0', f'"cost_cap_usd": {literal}', 1
+                    ),
+                    encoding="utf-8",
+                )
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "scripts/litellm_preflight.py",
+                        "--config",
+                        str(config_path),
+                        "--json",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                report = json.loads(result.stdout)
+                self.assertEqual(1, result.returncode)
+                self.assertFalse(report["ok"])
+                self.assertIn(
+                    "rag-default: limits.cost_cap_usd must be a finite non-negative number",
+                    report["errors"],
+                )
+                self.assertFalse(report["live_probe_requested"])
+                self.assertEqual("", result.stderr)
 
 
 if __name__ == "__main__":

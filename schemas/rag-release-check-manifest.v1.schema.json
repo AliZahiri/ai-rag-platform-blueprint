@@ -47,7 +47,9 @@
             "maxItems": 64,
             "items": {
               "type": "string",
-              "maxLength": 4096
+              "maxLength": 4096,
+              "pattern": "^[^\\u0000\\uD800-\\uDFFF]*$",
+              "description": "Arguments cannot contain null bytes or Unicode surrogate code points."
             }
           }
         }

@@ -62,6 +62,45 @@ class ReleaseCheckManifestTests(unittest.TestCase):
                 }
             )
 
+    def test_unicode_surrogate_argument_returns_structured_manifest_error(self):
+        manifest = {
+            "schema_version": 1,
+            "checks": [
+                {
+                    "id": "invalid-unicode",
+                    "gate": "litellm-preflight",
+                    "args": ["\ud800"],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_directory:
+            manifest_path = Path(temp_directory) / "release-checks.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            error = StringIO()
+            with redirect_stderr(error):
+                exit_code = main([str(manifest_path)])
+
+        report = json.loads(error.getvalue())
+        self.assertEqual(2, exit_code)
+        self.assertEqual("error", report["status"])
+        self.assertIn("Unicode surrogate", report["error"])
+
+    def test_non_ascii_argument_remains_valid(self):
+        manifest = validate_manifest(
+            {
+                "schema_version": 1,
+                "checks": [
+                    {
+                        "id": "unicode-path",
+                        "gate": "litellm-preflight",
+                        "args": ["داده.json"],
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual("داده.json", manifest["checks"][0]["args"][0])
+
 
 class ReleaseCheckRunnerTests(unittest.TestCase):
     def test_example_runs_all_offline_gates(self):

@@ -30,6 +30,11 @@ class ManifestError(ValueError):
     """Raised when a release-check manifest violates the versioned contract."""
 
 
+def _contains_unicode_surrogate(value: str) -> bool:
+    """Return whether a string contains an invalid Unicode surrogate code point."""
+    return any(0xD800 <= ord(character) <= 0xDFFF for character in value)
+
+
 def load_manifest(path: Path) -> dict[str, object]:
     """Load and validate a v1 release-check manifest."""
     try:
@@ -108,11 +113,13 @@ def validate_manifest(payload: object) -> dict[str, object]:
             if (
                 not isinstance(argument, str)
                 or "\x00" in argument
+                or _contains_unicode_surrogate(argument)
                 or len(argument) > MAX_ARGUMENT_LENGTH
             ):
                 raise ManifestError(
                     f"checks[{index}].args[{argument_index}] must be a string "
-                    f"of at most {MAX_ARGUMENT_LENGTH} characters without null bytes"
+                    f"of at most {MAX_ARGUMENT_LENGTH} characters without null bytes "
+                    "or Unicode surrogate code points"
                 )
 
         normalized_checks.append({"id": check_id, "gate": gate, "args": args})

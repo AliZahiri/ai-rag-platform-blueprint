@@ -22,7 +22,10 @@ Version 1 is described by
 [`schemas/rag-release-check-manifest.v1.schema.json`](../schemas/rag-release-check-manifest.v1.schema.json).
 Every check requires a unique lowercase `id`, an allowlisted `gate`, and the
 gate's normal arguments. Unknown fields, unknown gates, duplicate IDs, and
-unsupported schema versions fail before any gate runs.
+unsupported schema versions fail before any gate runs. Arguments may contain
+normal Unicode text, but null bytes and Unicode surrogate code points are
+rejected before process creation so malformed JSON strings cannot crash the
+runner while it encodes the child-process command.
 
 The runner executes gates directly with the current Python interpreter; it does
 not invoke a shell or accept executable paths from the manifest. Each gate has a

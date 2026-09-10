@@ -15,6 +15,22 @@ class RagAnswerReleaseGateTests(unittest.TestCase):
         self.assertIn("evidence_coverage_gate_failed:c1", violations)
         self.assertIn("retrieval_domain_diversity_gate_failed", violations)
 
+    def test_invalid_numeric_score_fails_closed(self):
+        results = [
+            {"source_id": "invalid", "source_url": "https://one.example/a", "score": float("nan")},
+            {"source_id": "valid", "source_url": "https://two.example/b", "score": 0.9},
+        ]
+
+        violations = answer_release_violations(
+            results=results,
+            claim_ids=["c1"],
+            evidence_by_claim={"c1": ["valid"]},
+            minimum_score=0.8,
+            minimum_domains=2,
+        )
+
+        self.assertEqual(("retrieval_confidence_gate_failed:invalid",), violations)
+
 
 if __name__ == "__main__":
     unittest.main()

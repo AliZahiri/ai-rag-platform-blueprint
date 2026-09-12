@@ -57,9 +57,37 @@ def load_tasks(backlog_path: Path) -> list[dict[str, str]]:
 
 def validate_relative_path(value: str) -> str:
     path = PurePosixPath(value)
-    if path.is_absolute() or ".." in path.parts:
+    if (
+        not value
+        or value != path.as_posix()
+        or path == PurePosixPath(".")
+        or path.is_absolute()
+        or ".." in path.parts
+        or any(part.casefold() == ".git" for part in path.parts)
+        or "\\" in value
+        or any(ord(character) < 32 for character in value)
+    ):
         raise ValueError(f"invalid task file path: {value}")
     return value
+
+
+def task_targets(root: Path, task: dict[str, object]) -> list[Path]:
+    """Validate every destination before reading or writing generated files."""
+    root = root.resolve()
+    targets = []
+    for item in task_files(task):
+        target = root / item["path"]
+        for component in (target, *target.parents):
+            if component == root:
+                break
+            if component.is_symlink():
+                raise ValueError(f"task file path contains a symlink: {item['path']}")
+        if not target.resolve().is_relative_to(root):
+            raise ValueError(f"task file path escapes repository: {item['path']}")
+        if target.exists() and not target.is_file():
+            raise ValueError(f"task target must be a regular file: {item['path']}")
+        targets.append(target)
+    return targets
 
 
 def task_files(task: dict[str, object]) -> list[dict[str, str]]:
@@ -68,6 +96,7 @@ def task_files(task: dict[str, object]) -> list[dict[str, str]]:
         if not isinstance(files, list) or not files:
             raise ValueError(f"task {task.get('id', '')} files must be a non-empty list")
         normalized = []
+        seen_paths: set[str] = set()
         for item in files:
             if not isinstance(item, dict):
                 raise ValueError(f"task {task.get('id', '')} file entries must be objects")
@@ -75,6 +104,10 @@ def task_files(task: dict[str, object]) -> list[dict[str, str]]:
             content = str(item.get("content", ""))
             if not path or not content:
                 raise ValueError(f"task {task.get('id', '')} file entries need path and content")
+            path = validate_relative_path(path)
+            if path in seen_paths:
+                raise ValueError(f"duplicate task file path: {path}")
+            seen_paths.add(path)
             normalized.append(
                 {
                     "path": validate_relative_path(path),
@@ -96,7 +129,7 @@ def task_marker(task_id: str) -> str:
 
 
 def is_task_complete(root: Path, task: dict[str, str]) -> bool:
-    targets = [root / item["path"] for item in task_files(task)]
+    targets = task_targets(root, task)
     if not all(target.exists() for target in targets):
         return False
     marker = task_marker(task["id"])
@@ -416,12 +449,10 @@ def write_github_output(values: dict[str, str]) -> None:
 
 
 def apply_task(root: Path, task: dict[str, str]) -> list[Path]:
-    targets = []
-    for item in task_files(task):
-        target = root / item["path"]
+    targets = task_targets(root, task)
+    for item, target in zip(task_files(task), targets):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(render_task_file(task, item), encoding="utf-8")
-        targets.append(target)
     return targets
 
 

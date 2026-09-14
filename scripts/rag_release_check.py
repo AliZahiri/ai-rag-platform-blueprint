@@ -41,6 +41,8 @@ def load_manifest(path: Path) -> dict[str, object]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except OSError as error:
         raise ManifestError(f"unable to read manifest: {error}") from error
+    except UnicodeDecodeError as error:
+        raise ManifestError("manifest is not valid UTF-8") from error
     except json.JSONDecodeError as error:
         raise ManifestError(f"manifest is not valid JSON: {error}") from error
     return validate_manifest(payload)

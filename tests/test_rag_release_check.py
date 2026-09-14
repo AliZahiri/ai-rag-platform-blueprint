@@ -85,6 +85,19 @@ class ReleaseCheckManifestTests(unittest.TestCase):
         self.assertEqual("error", report["status"])
         self.assertIn("Unicode surrogate", report["error"])
 
+    def test_invalid_utf8_returns_structured_manifest_error(self):
+        with tempfile.TemporaryDirectory() as temp_directory:
+            manifest_path = Path(temp_directory) / "release-checks.json"
+            manifest_path.write_bytes(b"\xff\xfe")
+            error = StringIO()
+            with redirect_stderr(error):
+                exit_code = main([str(manifest_path)])
+
+        report = json.loads(error.getvalue())
+        self.assertEqual(2, exit_code)
+        self.assertEqual("error", report["status"])
+        self.assertEqual("manifest is not valid UTF-8", report["error"])
+
     def test_non_ascii_argument_remains_valid(self):
         manifest = validate_manifest(
             {

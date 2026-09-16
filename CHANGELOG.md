@@ -6,7 +6,7 @@ The project follows Semantic Versioning for public release snapshots. Policy
 helpers and manifest schemas remain experimental unless their documentation
 states otherwise.
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-09-16
 
 ### Added
 

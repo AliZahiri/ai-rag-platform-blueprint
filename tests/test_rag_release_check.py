@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import Mock
 
 from scripts.rag_release_check import (
+    GATE_SCRIPTS,
     ManifestError,
     load_manifest,
     main,
@@ -27,7 +28,11 @@ class ReleaseCheckManifestTests(unittest.TestCase):
         manifest = load_manifest(EXAMPLE_MANIFEST)
 
         self.assertEqual(1, manifest["schema_version"])
-        self.assertEqual(5, len(manifest["checks"]))
+        self.assertEqual(len(GATE_SCRIPTS), len(manifest["checks"]))
+        self.assertEqual(
+            set(GATE_SCRIPTS),
+            {check["gate"] for check in manifest["checks"]},
+        )
 
     def test_unknown_gate_and_duplicate_ids_are_rejected(self):
         with self.assertRaisesRegex(ManifestError, "must be one of"):

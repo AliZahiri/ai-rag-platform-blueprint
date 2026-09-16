@@ -4,6 +4,11 @@ Reference architecture for running an internal AI, LLM, and RAG platform on prod
 
 This repository focuses on the platform layer around AI systems: gateway, routing, model serving, vector storage, databases, observability, deployment boundaries, and operational notes. It is not a model training project.
 
+See the [changelog](CHANGELOG.md) and the
+[v0.2.0 release notes](docs/releases/v0.2.0.md) for the current release
+candidate scope, compatibility contract, validation procedure, and known
+limitations.
+
 ## Architecture
 
 ```text
@@ -87,6 +92,10 @@ python3 scripts/rag_release_check.py examples/release-checks.example.json
 The command emits one aggregate JSON report and preserves the distinction
 between a policy rejection and an execution or manifest error. See the
 [unified release-check contract](docs/rag-release-check.md).
+
+The same manifest runs in CI on every push and pull request. It must cover
+every gate allowlisted by the unified runner; the test suite rejects incomplete
+release manifests when the allowlist changes.
 
 ## Offline Release Gates
 

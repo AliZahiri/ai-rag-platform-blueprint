@@ -108,6 +108,8 @@ model provider by default.
 | LiteLLM route preflight | `scripts/litellm_preflight.py` | Route, fallback, capability, secret-reference, and observability readiness |
 | Citation freshness | `scripts/citation_freshness_release.py` | Whether cited sources are identifiable and recently reviewed |
 | Chat retention | `scripts/chat_retention_policy_gate.py` | Whether retention policy fields and review controls are complete |
+| Evaluation regression | `scripts/rag_evaluation_regression.py` | Whether groundedness, citation precision, and answer relevance remain within the approved regression budget |
+| Response safety | `scripts/response_safety_classification.py` | Whether release decisions match sufficiently confident safety classifications |
 | Vector backup coverage | `scripts/rag_backup_plan.py` | Whether backup targets and restore checks cover the RAG data plane |
 | Index replica consistency | `scripts/index_replica_consistency.py` | Whether fresh replicas match the approved generation, count, and digest |
 | Unified release check | `scripts/rag_release_check.py` | Whether every gate selected by a versioned, allowlisted manifest passes |
@@ -135,8 +137,8 @@ contracts live under `docs/`. Provider liveness remains explicitly opt-in.
 
 ## Next Iterations
 
-- Extend the versioned release-check manifest to additional evaluation and
-  response-safety gates.
+- Extend the versioned release-check manifest to evaluation provenance and
+  prompt-injection evidence gates.
 - Add opt-in evidence collectors for LiteLLM, the vector store, and Prometheus
   while keeping default CI provider-free.
 - Pin default container references by digest and document the upgrade workflow.

@@ -23,6 +23,24 @@
       ]
     },
     {
+      "id": "evaluation-regression",
+      "gate": "evaluation-regression",
+      "args": [
+        "rag-evaluation-regression.example.json",
+        "--maximum-regression",
+        "0.05"
+      ]
+    },
+    {
+      "id": "response-safety",
+      "gate": "response-safety",
+      "args": [
+        "response-safety.example.json",
+        "--minimum-safe-confidence",
+        "0.8"
+      ]
+    },
+    {
       "id": "retention",
       "gate": "chat-retention",
       "args": [

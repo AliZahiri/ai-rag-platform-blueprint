@@ -6,6 +6,20 @@ The project follows Semantic Versioning for public release snapshots. Policy
 helpers and manifest schemas remain experimental unless their documentation
 states otherwise.
 
+## [Unreleased]
+
+### Added
+
+- Offline evaluation-regression and response-safety CLIs with deterministic
+  JSON reports and policy-versus-execution exit codes.
+- Evaluation and response-safety evidence examples in the unified release
+  manifest, so default CI now enforces both controls without provider calls.
+
+### Compatibility
+
+- The release-check manifest remains at schema version `1`; the allowlist adds
+  two gate names without changing existing gate arguments or entry points.
+
 ## [0.2.0] - 2026-09-16
 
 ### Added

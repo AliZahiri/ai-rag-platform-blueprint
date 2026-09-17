@@ -1,0 +1,12 @@
+{
+  "baseline": {
+    "groundedness": 0.91,
+    "citation_precision": 0.9,
+    "answer_relevance": 0.89
+  },
+  "candidate": {
+    "groundedness": 0.9,
+    "citation_precision": 0.91,
+    "answer_relevance": 0.87
+  }
+}

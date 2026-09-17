@@ -20,8 +20,10 @@ CHECK_ID_PATTERN = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
 GATE_SCRIPTS = {
     "chat-retention": "chat_retention_policy_gate.py",
     "citation-freshness": "citation_freshness_release.py",
+    "evaluation-regression": "rag_evaluation_regression.py",
     "index-replica-consistency": "index_replica_consistency.py",
     "litellm-preflight": "litellm_preflight.py",
+    "response-safety": "response_safety_classification.py",
     "vector-backup": "rag_backup_plan.py",
 }
 

@@ -21,6 +21,7 @@ from scripts.rag_release_check import (
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_MANIFEST = ROOT / "examples" / "release-checks.example.json"
+MANIFEST_SCHEMA = ROOT / "schemas" / "rag-release-check-manifest.v1.schema.json"
 
 
 class ReleaseCheckManifestTests(unittest.TestCase):
@@ -33,6 +34,14 @@ class ReleaseCheckManifestTests(unittest.TestCase):
             set(GATE_SCRIPTS),
             {check["gate"] for check in manifest["checks"]},
         )
+
+    def test_schema_gate_allowlist_matches_runner(self):
+        schema = json.loads(MANIFEST_SCHEMA.read_text(encoding="utf-8"))
+        schema_gates = schema["properties"]["checks"]["items"]["properties"][
+            "gate"
+        ]["enum"]
+
+        self.assertEqual(set(GATE_SCRIPTS), set(schema_gates))
 
     def test_unknown_gate_and_duplicate_ids_are_rejected(self):
         with self.assertRaisesRegex(ManifestError, "must be one of"):
@@ -130,7 +139,7 @@ class ReleaseCheckRunnerTests(unittest.TestCase):
         self.assertEqual(0, exit_code)
         self.assertEqual("pass", report["status"])
         self.assertEqual(
-            {"errors": 0, "failed": 0, "passed": 5, "total": 5},
+            {"errors": 0, "failed": 0, "passed": 7, "total": 7},
             report["summary"],
         )
 

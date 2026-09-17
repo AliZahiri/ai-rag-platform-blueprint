@@ -1,0 +1,14 @@
+[
+  {
+    "response_id": "release-evaluation-answer-001",
+    "classification": "safe",
+    "confidence": 0.96,
+    "release": true
+  },
+  {
+    "response_id": "release-evaluation-answer-002",
+    "classification": "safe",
+    "confidence": 0.91,
+    "release": true
+  }
+]

@@ -37,8 +37,10 @@
             "enum": [
               "chat-retention",
               "citation-freshness",
+              "evaluation-regression",
               "index-replica-consistency",
               "litellm-preflight",
+              "response-safety",
               "vector-backup"
             ]
           },

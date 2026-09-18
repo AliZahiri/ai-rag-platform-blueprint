@@ -23,6 +23,17 @@
       ]
     },
     {
+      "id": "compose-images",
+      "gate": "compose-image-pinning",
+      "args": [
+        "--compose",
+        "../compose/docker-compose.yml",
+        "--env",
+        "../env/.env.example",
+        "--json"
+      ]
+    },
+    {
       "id": "evaluation-regression",
       "gate": "evaluation-regression",
       "args": [

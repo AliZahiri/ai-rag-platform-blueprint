@@ -37,6 +37,7 @@
             "enum": [
               "chat-retention",
               "citation-freshness",
+              "compose-image-pinning",
               "evaluation-regression",
               "index-replica-consistency",
               "litellm-preflight",

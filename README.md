@@ -107,6 +107,7 @@ model provider by default.
 | --- | --- | --- |
 | LiteLLM route preflight | `scripts/litellm_preflight.py` | Route, fallback, capability, secret-reference, and observability readiness |
 | Citation freshness | `scripts/citation_freshness_release.py` | Whether cited sources are identifiable and recently reviewed |
+| Compose image pinning | `scripts/compose_image_pinning.py` | Whether defaults and reviewed overrides resolve to the same immutable image digest |
 | Chat retention | `scripts/chat_retention_policy_gate.py` | Whether retention policy fields and review controls are complete |
 | Evaluation regression | `scripts/rag_evaluation_regression.py` | Whether groundedness, citation precision, and answer relevance remain within the approved regression budget |
 | Response safety | `scripts/response_safety_classification.py` | Whether release decisions match sufficiently confident safety classifications |
@@ -116,10 +117,13 @@ model provider by default.
 
 Each command documents its arguments through `--help`; the related operational
 contracts live under `docs/`. Provider liveness remains explicitly opt-in.
+See [immutable Compose image pinning](docs/compose-image-pinning.md) for the
+current lock set and controlled upgrade procedure.
 
 ## Production Notes
 
-- Pin all container images before production use.
+- Default Compose images are digest-pinned; review and pin every production
+  override before use.
 - Keep model files, secrets, and customer data outside Git.
 - Separate GPU inference nodes from application and database nodes when capacity grows.
 - Measure both time-to-first-token and full response time.
@@ -141,5 +145,4 @@ contracts live under `docs/`. Provider liveness remains explicitly opt-in.
   prompt-injection evidence gates.
 - Add opt-in evidence collectors for LiteLLM, the vector store, and Prometheus
   while keeping default CI provider-free.
-- Pin default container references by digest and document the upgrade workflow.
 - Turn the current GPU and vector-restore guidance into runnable drill examples.

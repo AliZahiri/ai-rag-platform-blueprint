@@ -16,5 +16,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m unittest discover -s tests
+      - name: Validate immutable Compose image defaults
+        run: >-
+          python scripts/compose_image_pinning.py
+          --compose compose/docker-compose.yml
+          --env env/.env.example
+          --json
       - name: Run offline release gates
         run: python scripts/rag_release_check.py examples/release-checks.example.json

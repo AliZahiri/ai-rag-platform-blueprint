@@ -38,10 +38,12 @@
               "chat-retention",
               "citation-freshness",
               "compose-image-pinning",
+              "evaluation-dataset-provenance",
               "evaluation-regression",
               "index-replica-consistency",
               "litellm-preflight",
               "response-safety",
+              "retrieval-prompt-injection",
               "vector-backup"
             ]
           },

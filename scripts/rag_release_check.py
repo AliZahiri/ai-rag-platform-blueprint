@@ -21,10 +21,12 @@ GATE_SCRIPTS = {
     "chat-retention": "chat_retention_policy_gate.py",
     "citation-freshness": "citation_freshness_release.py",
     "compose-image-pinning": "compose_image_pinning.py",
+    "evaluation-dataset-provenance": "rag_evaluation_dataset_provenance.py",
     "evaluation-regression": "rag_evaluation_regression.py",
     "index-replica-consistency": "index_replica_consistency.py",
     "litellm-preflight": "litellm_preflight.py",
     "response-safety": "response_safety_classification.py",
+    "retrieval-prompt-injection": "retrieval_prompt_injection.py",
     "vector-backup": "rag_backup_plan.py",
 }
 

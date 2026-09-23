@@ -109,7 +109,9 @@ model provider by default.
 | Citation freshness | `scripts/citation_freshness_release.py` | Whether cited sources are identifiable and recently reviewed |
 | Compose image pinning | `scripts/compose_image_pinning.py` | Whether defaults and reviewed overrides resolve to the same immutable image digest |
 | Chat retention | `scripts/chat_retention_policy_gate.py` | Whether retention policy fields and review controls are complete |
+| Evaluation provenance | `scripts/rag_evaluation_dataset_provenance.py` | Whether evaluation cases are traceable to recent, immutable source evidence |
 | Evaluation regression | `scripts/rag_evaluation_regression.py` | Whether groundedness, citation precision, and answer relevance remain within the approved regression budget |
+| Retrieval prompt injection | `scripts/retrieval_prompt_injection.py` | Whether instruction-bearing untrusted chunks are quarantined before model context |
 | Response safety | `scripts/response_safety_classification.py` | Whether release decisions match sufficiently confident safety classifications |
 | Vector backup coverage | `scripts/rag_backup_plan.py` | Whether backup targets and restore checks cover the RAG data plane |
 | Index replica consistency | `scripts/index_replica_consistency.py` | Whether fresh replicas match the approved generation, count, and digest |
@@ -141,8 +143,6 @@ current lock set and controlled upgrade procedure.
 
 ## Next Iterations
 
-- Extend the versioned release-check manifest to evaluation provenance and
-  prompt-injection evidence gates.
 - Add opt-in evidence collectors for LiteLLM, the vector store, and Prometheus
   while keeping default CI provider-free.
 - Turn the current GPU and vector-restore guidance into runnable drill examples.

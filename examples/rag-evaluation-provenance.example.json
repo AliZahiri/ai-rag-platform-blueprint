@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {
+      "case_id": "support-reset-token-001",
+      "source_snapshot": "knowledge-base-2026-08-15-sha256:2e2cf4ea",
+      "expected_answer": "Follow the documented token reset procedure.",
+      "source_ids": [
+        "support-handbook-token-reset"
+      ],
+      "reviewed_at": "2026-08-20T09:30:00Z"
+    }
+  ]
+}

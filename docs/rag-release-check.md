@@ -13,7 +13,8 @@ python3 scripts/rag_release_check.py examples/release-checks.example.json
 ```
 
 Paths passed in each check's `args` are resolved from the manifest directory.
-The example covers route validation, citation freshness, evaluation regression,
+The example covers route validation, citation freshness, evaluation dataset
+provenance, evaluation regression, retrieval prompt-injection containment,
 response-safety classification, retention, vector backup verification, and
 multi-replica index consistency.
 
@@ -46,8 +47,12 @@ configuration: a manifest can select arguments such as input files or an
 explicit live-probe option supported by a gate. The provided example stays
 fully offline and does not require provider credentials.
 
-Evaluation and response-safety inputs are evidence snapshots, not live model
-calls. The evaluation gate compares bounded baseline and candidate scores for
-groundedness, citation precision, and answer relevance. The response-safety
-gate requires every releasable response to have a unique ID, a `safe`
-classification, a matching release decision, and sufficient confidence.
+Evaluation, retrieval, and response-safety inputs are evidence snapshots, not
+live model calls. The evaluation provenance gate requires each case to identify
+its immutable source snapshot, expected answer, source IDs, and a recent
+timezone-aware review. The evaluation regression gate compares bounded baseline
+and candidate scores for groundedness, citation precision, and answer relevance.
+The retrieval gate requires untrusted chunks with instruction signals to be
+quarantined and excluded from context. The response-safety gate requires every
+releasable response to have a unique ID, a `safe` classification, a matching
+release decision, and sufficient confidence.

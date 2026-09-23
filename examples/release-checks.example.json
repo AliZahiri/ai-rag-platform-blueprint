@@ -34,12 +34,30 @@
       ]
     },
     {
+      "id": "evaluation-provenance",
+      "gate": "evaluation-dataset-provenance",
+      "args": [
+        "rag-evaluation-provenance.example.json",
+        "--now",
+        "2026-09-05T12:00:00Z",
+        "--maximum-review-age-days",
+        "180"
+      ]
+    },
+    {
       "id": "evaluation-regression",
       "gate": "evaluation-regression",
       "args": [
         "rag-evaluation-regression.example.json",
         "--maximum-regression",
         "0.05"
+      ]
+    },
+    {
+      "id": "retrieval-prompt-injection",
+      "gate": "retrieval-prompt-injection",
+      "args": [
+        "retrieval-prompt-injection.example.json"
       ]
     },
     {

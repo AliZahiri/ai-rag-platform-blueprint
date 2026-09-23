@@ -1,0 +1,17 @@
+{
+  "chunks": [
+    {
+      "chunk_id": "handbook-token-reset-01",
+      "trust_level": "trusted",
+      "instruction_signal_count": 0,
+      "eligible_for_context": true
+    },
+    {
+      "chunk_id": "external-import-77",
+      "trust_level": "untrusted",
+      "instruction_signal_count": 2,
+      "quarantined": true,
+      "eligible_for_context": false
+    }
+  ]
+}

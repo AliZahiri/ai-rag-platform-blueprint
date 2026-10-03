@@ -28,6 +28,7 @@ GATE_SCRIPTS = {
     "response-safety": "response_safety_classification.py",
     "retrieval-prompt-injection": "retrieval_prompt_injection.py",
     "vector-backup": "rag_backup_plan.py",
+    "vector-restore-observation": "vector_restore_observation.py",
 }
 
 

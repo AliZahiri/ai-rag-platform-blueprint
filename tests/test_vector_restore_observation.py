@@ -1,5 +1,8 @@
 import unittest
 from datetime import datetime, timezone
+import json
+from pathlib import Path
+import subprocess
 
 from scripts.vector_restore_observation import vector_restore_violations
 
@@ -25,6 +28,47 @@ class VectorRestoreObservationGateTests(unittest.TestCase):
     def test_invalid_policy_fails(self):
         with self.assertRaises(ValueError):
             vector_restore_violations({}, now=NOW, maximum_age_seconds=0)
+
+    def test_cli_emits_a_passing_machine_readable_report(self):
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/vector_restore_observation.py",
+                "examples/vector-restore-observation.example.json",
+                "--now",
+                "2026-09-05T09:00:00Z",
+            ],
+            cwd=root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(
+            {"maximum_age_seconds": 86400, "status": "pass", "violations": []},
+            json.loads(result.stdout),
+        )
+
+    def test_cli_rejects_an_invalid_policy_timestamp(self):
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [
+                "python3",
+                "scripts/vector_restore_observation.py",
+                "examples/vector-restore-observation.example.json",
+                "--now",
+                "not-a-timestamp",
+            ],
+            cwd=root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertEqual(2, result.returncode)
+        self.assertEqual("error", json.loads(result.stderr)["status"])
 
 
 if __name__ == "__main__":

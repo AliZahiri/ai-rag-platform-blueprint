@@ -44,7 +44,8 @@
               "litellm-preflight",
               "response-safety",
               "retrieval-prompt-injection",
-              "vector-backup"
+              "vector-backup",
+              "vector-restore-observation"
             ]
           },
           "args": {

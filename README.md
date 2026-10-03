@@ -114,6 +114,7 @@ model provider by default.
 | Retrieval prompt injection | `scripts/retrieval_prompt_injection.py` | Whether instruction-bearing untrusted chunks are quarantined before model context |
 | Response safety | `scripts/response_safety_classification.py` | Whether release decisions match sufficiently confident safety classifications |
 | Vector backup coverage | `scripts/rag_backup_plan.py` | Whether backup targets and restore checks cover the RAG data plane |
+| Vector restore evidence | `scripts/vector_restore_observation.py` | Whether a recent restore matches record count, vector dimension, manifest digest, and a similarity-query check |
 | Index replica consistency | `scripts/index_replica_consistency.py` | Whether fresh replicas match the approved generation, count, and digest |
 | Unified release check | `scripts/rag_release_check.py` | Whether every gate selected by a versioned, allowlisted manifest passes |
 

@@ -121,6 +121,17 @@
         "--now",
         "2026-09-05T09:00:00Z"
       ]
+    },
+    {
+      "id": "vector-restore",
+      "gate": "vector-restore-observation",
+      "args": [
+        "vector-restore-observation.example.json",
+        "--now",
+        "2026-09-05T09:00:00Z",
+        "--maximum-age-seconds",
+        "86400"
+      ]
     }
   ]
 }

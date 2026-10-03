@@ -1,0 +1,10 @@
+{
+  "expected_record_count": 1200,
+  "restored_record_count": 1200,
+  "expected_dimension": 1536,
+  "restored_dimension": 1536,
+  "expected_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "restored_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "sample_query_passed": true,
+  "verified_at": "2026-09-05T08:30:00Z"
+}

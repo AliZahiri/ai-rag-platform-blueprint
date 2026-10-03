@@ -139,7 +139,7 @@ class ReleaseCheckRunnerTests(unittest.TestCase):
         self.assertEqual(0, exit_code)
         self.assertEqual("pass", report["status"])
         self.assertEqual(
-            {"errors": 0, "failed": 0, "passed": 10, "total": 10},
+            {"errors": 0, "failed": 0, "passed": 11, "total": 11},
             report["summary"],
         )
 

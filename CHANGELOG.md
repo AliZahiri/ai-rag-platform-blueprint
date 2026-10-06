@@ -8,6 +8,10 @@ states otherwise.
 
 ## [Unreleased]
 
+Draft release notes for the proposed `v0.3.0` candidate are available in
+[`docs/releases/v0.3.0.md`](docs/releases/v0.3.0.md). No tag or GitHub Release
+has been published.
+
 ### Added
 
 - Offline evaluation-regression and response-safety CLIs with deterministic

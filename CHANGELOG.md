@@ -6,11 +6,7 @@ The project follows Semantic Versioning for public release snapshots. Policy
 helpers and manifest schemas remain experimental unless their documentation
 states otherwise.
 
-## [Unreleased]
-
-Draft release notes for the proposed `v0.3.0` candidate are available in
-[`docs/releases/v0.3.0.md`](docs/releases/v0.3.0.md). No tag or GitHub Release
-has been published.
+## [0.3.0] - 2026-10-06
 
 ### Added
 
@@ -66,4 +62,5 @@ has been published.
 - No migration is required. Operators should review and version their release
   manifest before adopting the unified runner.
 
+[0.3.0]: https://github.com/AliZahiri/ai-rag-platform-blueprint/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AliZahiri/ai-rag-platform-blueprint/compare/v0.1.0...v0.2.0

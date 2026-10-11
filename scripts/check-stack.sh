@@ -6,6 +6,14 @@ ENV_FILE="${ENV_FILE:-.env}"
 STRICT="${STRICT:-false}"
 LITELLM_PREFLIGHT_CONFIG="${LITELLM_PREFLIGHT_CONFIG:-configs/litellm-routes.example.json}"
 
+case "$STRICT" in
+  true|false) ;;
+  *)
+    echo "STRICT must be either true or false; received: $STRICT" >&2
+    exit 2
+    ;;
+esac
+
 CHECKS=(
   "litellm-config=${LITELLM_PREFLIGHT_CONFIG}"
   "vector-db=http://localhost:${VECTOR_DB_PORT:-6333}/healthz"
@@ -40,6 +48,10 @@ echo "Endpoint checks:"
 if ! command -v curl >/dev/null 2>&1; then
   echo "curl is not available; suggested checks:"
   print_checks
+  if [[ "$STRICT" == "true" ]]; then
+    echo "STRICT=true requires curl so endpoint checks cannot be skipped." >&2
+    exit 2
+  fi
   exit 0
 fi
 

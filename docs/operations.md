@@ -12,6 +12,20 @@ At minimum, monitor:
 - Redis availability and memory pressure
 - Vector database query latency
 
+## Stack Readiness Verification
+
+Run the local stack verifier after Compose starts:
+
+```bash
+STRICT=true ./scripts/check-stack.sh
+```
+
+`STRICT=true` makes every configured endpoint check a release-blocking
+condition. It also fails with exit code `2` when `curl` is unavailable, rather
+than reporting a successful verification without making endpoint requests.
+Use the default `STRICT=false` only for diagnostic runs where unavailable
+endpoints are informational.
+
 ## Observability
 
 Recommended baseline:

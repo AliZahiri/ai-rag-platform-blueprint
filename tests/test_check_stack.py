@@ -1,4 +1,6 @@
+import os
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -20,6 +22,44 @@ class CheckStackTests(unittest.TestCase):
         self.assertIn("prometheus", result.stdout)
         self.assertIn("grafana", result.stdout)
         self.assertIn("litellm-config", result.stdout)
+
+    def test_strict_mode_rejects_missing_curl(self):
+        with tempfile.TemporaryDirectory() as directory:
+            command_directory = Path(directory)
+            self._write_command(command_directory, "python3", "exit 0")
+            self._write_command(command_directory, "docker", "exit 0")
+
+            result = self._run_stack_check(command_directory, strict="true")
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("STRICT=true requires curl", result.stderr)
+
+    def test_invalid_strict_mode_is_rejected_before_running_checks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._run_stack_check(Path(directory), strict="sometimes")
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("STRICT must be either true or false", result.stderr)
+
+    def _run_stack_check(self, command_directory: Path, *, strict: str) -> subprocess.CompletedProcess[str]:
+        environment = os.environ | {
+            "PATH": str(command_directory),
+            "STRICT": strict,
+        }
+        return subprocess.run(
+            ["/bin/bash", "scripts/check-stack.sh"],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=environment,
+        )
+
+    @staticmethod
+    def _write_command(directory: Path, name: str, body: str) -> None:
+        path = directory / name
+        path.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
+        path.chmod(0o755)
 
 
 if __name__ == "__main__":

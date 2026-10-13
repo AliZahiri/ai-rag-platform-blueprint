@@ -43,6 +43,7 @@
               "index-replica-consistency",
               "litellm-preflight",
               "response-safety",
+              "retrieval-evaluation",
               "retrieval-prompt-injection",
               "vector-backup",
               "vector-restore-observation"

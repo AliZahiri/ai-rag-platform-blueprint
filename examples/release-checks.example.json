@@ -54,6 +54,19 @@
       ]
     },
     {
+      "id": "retrieval-evaluation",
+      "gate": "retrieval-evaluation",
+      "args": [
+        "retrieval-evaluation.example.json",
+        "--top-k",
+        "3",
+        "--minimum-recall-at-k",
+        "0.80",
+        "--minimum-mrr-at-k",
+        "0.80"
+      ]
+    },
+    {
       "id": "retrieval-prompt-injection",
       "gate": "retrieval-prompt-injection",
       "args": [

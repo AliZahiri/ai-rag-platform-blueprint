@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "case_id": "support-reset-token-001",
+      "relevant_source_ids": [
+        "support-handbook-token-reset"
+      ],
+      "retrieved_source_ids": [
+        "support-handbook-token-reset",
+        "support-account-lockout"
+      ]
+    },
+    {
+      "case_id": "billing-export-002",
+      "relevant_source_ids": [
+        "billing-export-guide",
+        "billing-retention-policy"
+      ],
+      "retrieved_source_ids": [
+        "billing-export-guide",
+        "billing-retention-policy",
+        "billing-support-escalation"
+      ]
+    },
+    {
+      "case_id": "security-access-review-003",
+      "relevant_source_ids": [
+        "security-access-review"
+      ],
+      "retrieved_source_ids": [
+        "security-incident-playbook",
+        "security-access-review"
+      ]
+    }
+  ]
+}

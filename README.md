@@ -111,6 +111,7 @@ model provider by default.
 | Chat retention | `scripts/chat_retention_policy_gate.py` | Whether retention policy fields and review controls are complete |
 | Evaluation provenance | `scripts/rag_evaluation_dataset_provenance.py` | Whether evaluation cases are traceable to recent, immutable source evidence |
 | Evaluation regression | `scripts/rag_evaluation_regression.py` | Whether groundedness, citation precision, and answer relevance remain within the approved regression budget |
+| Retrieval evaluation | `scripts/retrieval_evaluation.py` | Whether ranked retrieval evidence meets explicit Recall@k and MRR@k release thresholds |
 | Retrieval prompt injection | `scripts/retrieval_prompt_injection.py` | Whether instruction-bearing untrusted chunks are quarantined before model context |
 | Response safety | `scripts/response_safety_classification.py` | Whether release decisions match sufficiently confident safety classifications |
 | Vector backup coverage | `scripts/rag_backup_plan.py` | Whether backup targets and restore checks cover the RAG data plane |

@@ -27,6 +27,7 @@ GATE_SCRIPTS = {
     "litellm-preflight": "litellm_preflight.py",
     "response-safety": "response_safety_classification.py",
     "retrieval-prompt-injection": "retrieval_prompt_injection.py",
+    "retrieval-evaluation": "retrieval_evaluation.py",
     "vector-backup": "rag_backup_plan.py",
     "vector-restore-observation": "vector_restore_observation.py",
 }

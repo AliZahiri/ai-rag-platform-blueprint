@@ -14,6 +14,15 @@ class DailyWorkflowScheduleTests(unittest.TestCase):
         self.assertIn('cron: "30 4 * * *"', content)
         self.assertIn("08:00 Asia/Tehran", content)
 
+    def test_uses_configured_github_noreply_identity(self) -> None:
+        content = DAILY_WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn('git config user.name "S.Ali Zahiri"', content)
+        self.assertIn(
+            'git config user.email "1667664+AliZahiri@users.noreply.github.com"',
+            content,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

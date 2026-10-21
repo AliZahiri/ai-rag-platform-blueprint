@@ -19,7 +19,7 @@ class DailyWorkflowScheduleTests(unittest.TestCase):
 
         self.assertIn('git config user.name "S.Ali Zahiri"', content)
         self.assertIn(
-            'git config user.email "1667664+AliZahiri@users.noreply.github.com"',
+            'git config user.email "1667665+AliZahiri@users.noreply.github.com"',
             content,
         )
 

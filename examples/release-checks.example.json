@@ -12,6 +12,15 @@
       ]
     },
     {
+      "id": "route-contract",
+      "gate": "litellm-route-contract",
+      "args": [
+        "--config",
+        "../configs/litellm-routes.example.json",
+        "--json"
+      ]
+    },
+    {
       "id": "citations",
       "gate": "citation-freshness",
       "args": [

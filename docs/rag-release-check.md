@@ -13,7 +13,7 @@ python3 scripts/rag_release_check.py examples/release-checks.example.json
 ```
 
 Paths passed in each check's `args` are resolved from the manifest directory.
-The example covers route validation, citation freshness, evaluation dataset
+The example covers route validation, LiteLLM workload and fallback contracts, citation freshness, evaluation dataset
 provenance, evaluation regression, retrieval prompt-injection containment,
 response-safety classification, retention, vector backup verification, and
 multi-replica index consistency.

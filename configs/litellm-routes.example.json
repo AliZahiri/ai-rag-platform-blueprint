@@ -41,6 +41,14 @@
       }
     }
   ],
+  "workloads": [
+    {
+      "id": "rag-chat",
+      "route": "rag-default",
+      "required_capabilities": ["streaming", "tool_calling", "json_mode"],
+      "required_context_tokens": 8192
+    }
+  ],
   "observability": {
     "latency": true,
     "tokens": true,

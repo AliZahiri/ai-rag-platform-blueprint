@@ -18,6 +18,35 @@ Required checks:
 - capabilities required by the RAG stack are available: streaming, tool calling, JSON mode, and enough context window
 - observability fields are enabled for latency, token usage, cost, and failures
 
+## Route and Fallback Workload Contract
+
+The route contract combines route preflight with workload requirements. Each
+workload names its primary route, required capabilities, and minimum context
+window. Every route in the complete fallback chain must satisfy the same
+requirements, so an availability fallback cannot silently lose JSON mode, tool
+calling, streaming, or context capacity.
+
+Run it locally or in provider-free CI:
+
+```bash
+python scripts/litellm_route_contract.py \
+  --config configs/litellm-routes.example.json \
+  --json
+```
+
+The JSON report includes the validated route aliases and each workload's
+resolved fallback chain. It never calls a provider or prints secret values.
+The example configuration declares this contract:
+
+```json
+{
+  "id": "rag-chat",
+  "route": "rag-default",
+  "required_capabilities": ["streaming", "tool_calling", "json_mode"],
+  "required_context_tokens": 8192
+}
+```
+
 All route limits must be finite, non-negative numbers. Booleans, `NaN`, infinity,
 and JSON numbers that overflow to infinity (such as `1e309`) are rejected.
 RPM, TPM, and timeout must be greater than zero; retries and cost cap may be zero.

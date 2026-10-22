@@ -25,6 +25,7 @@ GATE_SCRIPTS = {
     "evaluation-regression": "rag_evaluation_regression.py",
     "index-replica-consistency": "index_replica_consistency.py",
     "litellm-preflight": "litellm_preflight.py",
+    "litellm-route-contract": "litellm_route_contract.py",
     "response-safety": "response_safety_classification.py",
     "retrieval-prompt-injection": "retrieval_prompt_injection.py",
     "retrieval-evaluation": "retrieval_evaluation.py",

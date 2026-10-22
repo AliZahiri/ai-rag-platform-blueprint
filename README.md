@@ -106,6 +106,7 @@ model provider by default.
 | Gate | Entry point | Operational decision |
 | --- | --- | --- |
 | LiteLLM route preflight | `scripts/litellm_preflight.py` | Route, fallback, capability, secret-reference, and observability readiness |
+| LiteLLM route contract | `scripts/litellm_route_contract.py` | Workload capability and context guarantees across every fallback route |
 | Citation freshness | `scripts/citation_freshness_release.py` | Whether cited sources are identifiable and recently reviewed |
 | Compose image pinning | `scripts/compose_image_pinning.py` | Whether defaults and reviewed overrides resolve to the same immutable image digest |
 | Chat retention | `scripts/chat_retention_policy_gate.py` | Whether retention policy fields and review controls are complete |

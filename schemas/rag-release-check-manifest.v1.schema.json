@@ -42,6 +42,7 @@
               "evaluation-regression",
               "index-replica-consistency",
               "litellm-preflight",
+              "litellm-route-contract",
               "response-safety",
               "retrieval-evaluation",
               "retrieval-prompt-injection",

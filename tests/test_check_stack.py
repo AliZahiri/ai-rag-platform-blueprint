@@ -23,16 +23,20 @@ class CheckStackTests(unittest.TestCase):
         self.assertIn("grafana", result.stdout)
         self.assertIn("litellm-config", result.stdout)
 
-    def test_strict_mode_rejects_missing_curl(self):
+    def test_strict_mode_delegates_readiness_to_the_collector(self):
         with tempfile.TemporaryDirectory() as directory:
             command_directory = Path(directory)
-            self._write_command(command_directory, "python3", "exit 0")
+            self._write_command(
+                command_directory,
+                "python3",
+                'if [ "$1" = "scripts/litellm_preflight.py" ]; then exit 0; fi; case "$*" in *"--require-ready"*) exit 0 ;; *) exit 7 ;; esac',
+            )
             self._write_command(command_directory, "docker", "exit 0")
 
             result = self._run_stack_check(command_directory, strict="true")
 
-        self.assertEqual(2, result.returncode)
-        self.assertIn("STRICT=true requires curl", result.stderr)
+        self.assertEqual(0, result.returncode)
+        self.assertIn("Platform readiness", result.stdout)
 
     def test_invalid_strict_mode_is_rejected_before_running_checks(self):
         with tempfile.TemporaryDirectory() as directory:

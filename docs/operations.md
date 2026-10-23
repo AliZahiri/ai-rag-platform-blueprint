@@ -21,10 +21,11 @@ STRICT=true ./scripts/check-stack.sh
 ```
 
 `STRICT=true` makes every configured endpoint check a release-blocking
-condition. It also fails with exit code `2` when `curl` is unavailable, rather
-than reporting a successful verification without making endpoint requests.
-Use the default `STRICT=false` only for diagnostic runs where unavailable
-endpoints are informational.
+condition. The verifier uses the standard-library readiness collector and emits
+a structured JSON report rather than relying on a local `curl` binary. Use the
+default `STRICT=false` only for diagnostic runs where unavailable endpoints are
+informational. See [platform readiness](platform-readiness.md) for the report
+contract and optional LiteLLM probe.
 
 ## Observability
 

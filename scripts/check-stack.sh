@@ -5,6 +5,8 @@ COMPOSE_FILE="${COMPOSE_FILE:-compose/docker-compose.yml}"
 ENV_FILE="${ENV_FILE:-.env}"
 STRICT="${STRICT:-false}"
 LITELLM_PREFLIGHT_CONFIG="${LITELLM_PREFLIGHT_CONFIG:-configs/litellm-routes.example.json}"
+READINESS_TIMEOUT_SECONDS="${READINESS_TIMEOUT_SECONDS:-3}"
+LITELLM_READINESS_URL="${LITELLM_READINESS_URL:-}"
 
 case "$STRICT" in
   true|false) ;;
@@ -42,31 +44,22 @@ run_litellm_preflight
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 
+collector_args=(
+  python3 scripts/collect_platform_readiness.py
+  --vector-db-url "http://localhost:${VECTOR_DB_PORT:-6333}"
+  --prometheus-url "http://localhost:${PROMETHEUS_PORT:-9090}"
+  --grafana-url "http://localhost:${GRAFANA_PORT:-3000}"
+  --timeout-seconds "$READINESS_TIMEOUT_SECONDS"
+)
+
+if [[ -n "$LITELLM_READINESS_URL" ]]; then
+  collector_args+=(--litellm-url "$LITELLM_READINESS_URL")
+fi
+
+if [[ "$STRICT" == "true" ]]; then
+  collector_args+=(--require-ready)
+fi
+
 echo
-echo "Endpoint checks:"
-
-if ! command -v curl >/dev/null 2>&1; then
-  echo "curl is not available; suggested checks:"
-  print_checks
-  if [[ "$STRICT" == "true" ]]; then
-    echo "STRICT=true requires curl so endpoint checks cannot be skipped." >&2
-    exit 2
-  fi
-  exit 0
-fi
-
-failed=0
-for item in "${CHECKS[@]}"; do
-  name="${item%%=*}"
-  url="${item#*=}"
-  if curl --fail --silent --show-error --max-time 3 "$url" >/dev/null; then
-    printf '  [ok]   %s\n' "$name"
-  else
-    printf '  [fail] %s -> %s\n' "$name" "$url"
-    failed=1
-  fi
-done
-
-if [[ "$STRICT" == "true" && "$failed" -ne 0 ]]; then
-  exit 1
-fi
+echo "Platform readiness:"
+"${collector_args[@]}"

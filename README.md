@@ -97,6 +97,17 @@ The same manifest runs in CI on every push and pull request. It must cover
 every gate allowlisted by the unified runner; the test suite rejects incomplete
 release manifests when the allowlist changes.
 
+After Compose starts, collect live, credential-safe readiness evidence for the
+local dependencies:
+
+```bash
+STRICT=true ./scripts/check-stack.sh
+```
+
+The command writes a structured JSON report for Qdrant, Prometheus, Grafana,
+and optional LiteLLM. See the [platform readiness collector](docs/platform-readiness.md)
+for its strict-mode behavior and LiteLLM profile integration.
+
 ## Offline Release Gates
 
 The repository includes executable, provider-free gates for CI and release
@@ -146,6 +157,4 @@ current lock set and controlled upgrade procedure.
 
 ## Next Iterations
 
-- Add opt-in evidence collectors for LiteLLM, the vector store, and Prometheus
-  while keeping default CI provider-free.
 - Turn the current GPU and vector-restore guidance into runnable drill examples.

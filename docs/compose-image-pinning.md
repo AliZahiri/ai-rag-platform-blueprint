@@ -15,7 +15,7 @@ The following tag-to-digest resolutions were verified on 2026-09-18 with
 | --- | --- | --- |
 | PostgreSQL | `postgres:16-alpine` | `sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb` |
 | Redis | `redis:7-alpine` | `sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7` |
-| Qdrant | `qdrant/qdrant:latest` | `sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10` |
+| Qdrant (primary and restore drill) | `qdrant/qdrant:latest` | `sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10` |
 | LiteLLM | `ghcr.io/berriai/litellm:main-latest` | `sha256:52abe19ecef09d149abd23f8a4aed6683dd7f780f90a0c20d214dfb29006f2dd` |
 | Prometheus | `prom/prometheus:v2.54.1` | `sha256:f6639335d34a77d9d9db382b92eeb7fc00934be8eae81dbc03b31cfe90411a94` |
 | Grafana | `grafana/grafana:11.1.4` | `sha256:886b56d5534e54f69a8cfcb4b8928da8fc753178a7a3d20c3f9b04b660169805` |

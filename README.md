@@ -108,6 +108,15 @@ The command writes a structured JSON report for Qdrant, Prometheus, Grafana,
 and optional LiteLLM. See the [platform readiness collector](docs/platform-readiness.md)
 for its strict-mode behavior and LiteLLM profile integration.
 
+Run an isolated Qdrant snapshot restore drill and produce release-gate evidence:
+
+```bash
+python3 scripts/qdrant_restore_drill.py --collection knowledge --output qdrant-restore-observation.json
+```
+
+See [the Qdrant restore drill](docs/qdrant-restore-drill.md) for the required
+isolated Compose profile, safety checks, and evidence validation command.
+
 ## Offline Release Gates
 
 The repository includes executable, provider-free gates for CI and release

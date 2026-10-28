@@ -6,6 +6,32 @@ The project follows Semantic Versioning for public release snapshots. Policy
 helpers and manifest schemas remain experimental unless their documentation
 states otherwise.
 
+## [Unreleased]
+
+### Added
+
+- A retrieval evaluation release gate with deterministic metric contracts and
+  evaluation decision-record checks.
+- LiteLLM fallback workload contracts for validating route behavior against
+  representative workloads before release.
+- A platform readiness collector that records service readiness evidence for
+  operational review.
+- An isolated Qdrant restore drill that validates backup recovery without
+  modifying the active vector store.
+- Retrieval source lifecycle gates for ownership coverage, change budgets,
+  deprecation, and supersession.
+
+### Changed
+
+- Stack readiness checks now fail when required services are stopped or their
+  health checks are missing or unhealthy.
+- Qdrant health checks use commands supported by the configured image.
+
+### Compatibility
+
+- The release-check manifest remains at schema version `1`; new checks are
+  additive and existing gate entry points remain available.
+
 ## [0.3.0] - 2026-10-06
 
 ### Added

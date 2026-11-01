@@ -8,6 +8,8 @@ states otherwise.
 
 ## [Unreleased]
 
+## [0.4.0] - TBD
+
 ### Added
 
 - A retrieval evaluation release gate with deterministic metric contracts and
@@ -31,6 +33,8 @@ states otherwise.
 
 - The release-check manifest remains at schema version `1`; new checks are
   additive and existing gate entry points remain available.
+
+[0.4.0]: https://github.com/AliZahiri/ai-rag-platform-blueprint/compare/v0.3.0...v0.4.0
 
 ## [0.3.0] - 2026-10-06
 

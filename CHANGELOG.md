@@ -8,7 +8,7 @@ states otherwise.
 
 ## [Unreleased]
 
-## [0.4.0] - TBD
+## [0.4.0] - 2026-11-03
 
 ### Added
 

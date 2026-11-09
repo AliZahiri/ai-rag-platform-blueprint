@@ -7,12 +7,12 @@ DAILY_WORKFLOW = ROOT / ".github" / "workflows" / "daily-pr.yml"
 
 
 class DailyWorkflowScheduleTests(unittest.TestCase):
-    def test_runs_once_daily_at_tehran_eight(self) -> None:
+    def test_runs_once_daily_in_staggered_tehran_window(self) -> None:
         content = DAILY_WORKFLOW.read_text(encoding="utf-8")
 
         self.assertEqual(1, content.count("cron:"))
-        self.assertIn('cron: "30 4 * * *"', content)
-        self.assertIn("08:00 Asia/Tehran", content)
+        self.assertIn('cron: "20 4 * * *"', content)
+        self.assertIn("07:50 Asia/Tehran", content)
 
     def test_uses_configured_github_noreply_identity(self) -> None:
         content = DAILY_WORKFLOW.read_text(encoding="utf-8")

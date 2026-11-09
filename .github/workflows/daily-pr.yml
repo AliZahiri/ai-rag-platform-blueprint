@@ -2,8 +2,8 @@ name: Daily Portfolio PR
 
 on:
   schedule:
-    # 08:00 Asia/Tehran (UTC+03:30)
-    - cron: "30 4 * * *"
+    # 07:50 Asia/Tehran (UTC+03:30); staggered to reduce simultaneous portfolio runs.
+    - cron: "20 4 * * *"
   workflow_dispatch:
 
 permissions:

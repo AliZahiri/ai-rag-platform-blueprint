@@ -96,6 +96,34 @@ class CitationFreshnessReleaseTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("must be a JSON array", result.stderr)
 
+    def test_cli_rejects_invalid_source_review_date(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = Path(tmpdir) / "sources.json"
+            input_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "source_id": "policy-1",
+                            "location": "s3://docs/policy.pdf",
+                            "status": "valid",
+                            "last_reviewed_at": "not-a-date",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                ["python3", "scripts/citation_freshness_release.py", str(input_path), "--today", "2026-07-25"],
+                cwd=Path(__file__).resolve().parents[1],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("citation source 0 last_reviewed_at", result.stderr)
+        self.assertIn("valid ISO date", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -63,8 +63,10 @@ def load_sources(path: Path) -> list[dict[str, object]]:
         if isinstance(reviewed_at, str):
             try:
                 source["last_reviewed_at"] = date.fromisoformat(reviewed_at)
-            except ValueError:
-                pass
+            except ValueError as error:
+                raise ValueError(
+                    f"citation source {index} last_reviewed_at must be a valid ISO date"
+                ) from error
         sources.append(source)
     return sources
 

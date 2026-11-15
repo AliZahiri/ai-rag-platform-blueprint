@@ -5,9 +5,8 @@ Reference architecture for running an internal AI, LLM, and RAG platform on prod
 This repository focuses on the platform layer around AI systems: gateway, routing, model serving, vector storage, databases, observability, deployment boundaries, and operational notes. It is not a model training project.
 
 See the [changelog](CHANGELOG.md) and the
-[v0.2.0 release notes](docs/releases/v0.2.0.md) for the current release
-candidate scope, compatibility contract, validation procedure, and known
-limitations.
+[v0.4.0 release notes](docs/releases/v0.4.0.md) for the current release
+scope, compatibility contract, validation procedure, and known limitations.
 
 ## Architecture
 

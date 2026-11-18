@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 
 def source_freshness_warnings(source: dict[str, object], *, today: date, max_age_days: int = 180) -> tuple[str, ...]:
@@ -11,7 +11,7 @@ def source_freshness_warnings(source: dict[str, object], *, today: date, max_age
     if status not in {"valid", "amended", "review_required"}:
         warnings.append("source_status_unknown")
     reviewed_at = source.get("last_reviewed_at")
-    if not isinstance(reviewed_at, date):
+    if not isinstance(reviewed_at, date) or isinstance(reviewed_at, datetime):
         warnings.append("last_reviewed_at_missing")
         return tuple(warnings)
     age_days = (today - reviewed_at).days

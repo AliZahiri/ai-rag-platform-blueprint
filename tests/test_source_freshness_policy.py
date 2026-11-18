@@ -1,6 +1,6 @@
 import importlib.util
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts/source_freshness_policy.py"
@@ -27,6 +27,14 @@ class SourceFreshnessPolicyTests(unittest.TestCase):
         )
 
         self.assertEqual(("source_review_is_in_future",), warnings)
+
+    def test_datetime_review_value_is_reported_as_invalid(self):
+        warnings = source_freshness_policy.source_freshness_warnings(
+            {"status": "valid", "last_reviewed_at": datetime(2026, 7, 1, tzinfo=timezone.utc)},
+            today=date(2026, 7, 5),
+        )
+
+        self.assertEqual(("last_reviewed_at_missing",), warnings)
 
     def test_age_budget_must_be_a_positive_integer(self):
         with self.assertRaises(ValueError):

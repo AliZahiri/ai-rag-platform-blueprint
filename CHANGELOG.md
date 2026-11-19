@@ -8,6 +8,21 @@ states otherwise.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-19
+
+### Fixed
+
+- Citation freshness validation now rejects malformed source review dates
+  instead of silently ignoring them.
+- Source freshness policy now rejects `datetime` values where a date-only
+  review value is required, avoiding invalid freshness calculations.
+
+### Compatibility
+
+- The release-check manifest remains at schema version `1`; no CLI entry points
+  or manifest fields changed. Invalid date evidence now fails explicitly or is
+  reported as missing instead of being silently accepted.
+
 ## [0.4.0] - 2026-11-03
 
 ### Added
@@ -35,6 +50,7 @@ states otherwise.
   additive and existing gate entry points remain available.
 
 [0.4.0]: https://github.com/AliZahiri/ai-rag-platform-blueprint/compare/v0.3.0...v0.4.0
+[0.4.1]: https://github.com/AliZahiri/ai-rag-platform-blueprint/compare/v0.4.0...v0.4.1
 
 ## [0.3.0] - 2026-10-06
 

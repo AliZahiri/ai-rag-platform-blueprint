@@ -23,6 +23,7 @@ GATE_SCRIPTS = {
     "compose-image-pinning": "compose_image_pinning.py",
     "evaluation-dataset-provenance": "rag_evaluation_dataset_provenance.py",
     "evaluation-regression": "rag_evaluation_regression.py",
+    "gpu-node-readiness": "gpu_node_readiness.py",
     "index-replica-consistency": "index_replica_consistency.py",
     "litellm-preflight": "litellm_preflight.py",
     "litellm-route-contract": "litellm_route_contract.py",

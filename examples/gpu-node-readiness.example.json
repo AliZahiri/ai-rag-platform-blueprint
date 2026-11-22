@@ -1,0 +1,15 @@
+[
+  {
+    "node": "gpu-01",
+    "driver_version": "550.90.07",
+    "container_runtime": "nvidia-container-toolkit",
+    "gpu_count": 2,
+    "model_cache_ready": true,
+    "health_check_passed": true,
+    "gpu_metrics_available": true,
+    "rollback_ready": true,
+    "model_image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rollback_image_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "observed_at": "2026-11-22T11:55:00Z"
+  }
+]

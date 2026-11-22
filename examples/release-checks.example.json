@@ -63,6 +63,15 @@
       ]
     },
     {
+      "id": "gpu-readiness",
+      "gate": "gpu-node-readiness",
+      "args": [
+        "gpu-node-readiness.example.json",
+        "--now",
+        "2026-11-22T12:00:00Z"
+      ]
+    },
+    {
       "id": "retrieval-evaluation",
       "gate": "retrieval-evaluation",
       "args": [

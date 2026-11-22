@@ -8,6 +8,12 @@ states otherwise.
 
 ## [Unreleased]
 
+### Added
+
+- An offline GPU node readiness gate that validates runtime evidence, immutable
+  model and rollback images, rollback readiness, and evidence freshness in the
+  unified release manifest.
+
 ## [0.4.1] - 2026-11-19
 
 ### Fixed

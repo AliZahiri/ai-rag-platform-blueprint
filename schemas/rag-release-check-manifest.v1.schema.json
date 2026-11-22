@@ -40,6 +40,7 @@
               "compose-image-pinning",
               "evaluation-dataset-provenance",
               "evaluation-regression",
+              "gpu-node-readiness",
               "index-replica-consistency",
               "litellm-preflight",
               "litellm-route-contract",

@@ -14,6 +14,11 @@ states otherwise.
   model and rollback images, rollback readiness, and evidence freshness in the
   unified release manifest.
 
+### Changed
+
+- GPU readiness now rejects a fleet whose valid node observations reference
+  different model or rollback image digests, preventing mixed-image promotion.
+
 ## [0.4.1] - 2026-11-19
 
 ### Fixed

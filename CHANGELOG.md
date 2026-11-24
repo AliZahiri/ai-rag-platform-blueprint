@@ -8,6 +8,10 @@ states otherwise.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.4.2] - 2026-11-24
+
 ### Added
 
 - An offline GPU node readiness gate that validates runtime evidence, immutable
@@ -62,6 +66,7 @@ states otherwise.
 
 [0.4.0]: https://github.com/AliZahiri/ai-rag-platform-blueprint/compare/v0.3.0...v0.4.0
 [0.4.1]: https://github.com/AliZahiri/ai-rag-platform-blueprint/compare/v0.4.0...v0.4.1
+[0.4.2]: https://github.com/AliZahiri/ai-rag-platform-blueprint/compare/v0.4.1...v0.4.2
 
 ## [0.3.0] - 2026-10-06
 

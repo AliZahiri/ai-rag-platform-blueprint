@@ -59,6 +59,19 @@ class GpuNodeReadinessGateTests(unittest.TestCase):
         self.assertIn("node_2:rollback_image_digest_must_differ", violations)
         self.assertIn("node_0:readiness_evidence_is_not_fresh", violations)
 
+    def test_mixed_fleet_image_digests_fail(self):
+        second = ready_observation()
+        second["node"] = "gpu-02"
+        second["model_image_digest"] = "sha256:" + "c" * 64
+        second["rollback_image_digest"] = "sha256:" + "d" * 64
+
+        violations = gpu_node_readiness_violations(
+            [ready_observation(), second], now=NOW
+        )
+
+        self.assertIn("fleet:model_image_digest_must_match_all_nodes", violations)
+        self.assertIn("fleet:rollback_image_digest_must_match_all_nodes", violations)
+
     def test_invalid_policy_is_rejected(self):
         with self.assertRaises(ValueError):
             gpu_node_readiness_violations([], now=NOW, maximum_age_seconds=0)

@@ -58,6 +58,8 @@ def gpu_node_readiness_violations(
 
     violations: list[str] = []
     seen_nodes: set[str] = set()
+    model_digests: set[str] = set()
+    rollback_digests: set[str] = set()
     for index, observation in enumerate(observations):
         prefix = f"node_{index}"
         if not isinstance(observation, dict):
@@ -93,8 +95,12 @@ def gpu_node_readiness_violations(
         rollback_digest = observation.get("rollback_image_digest")
         if not isinstance(model_digest, str) or not _IMAGE_DIGEST.fullmatch(model_digest):
             violations.append(f"{prefix}:model_image_digest_must_be_immutable")
+        else:
+            model_digests.add(model_digest)
         if not isinstance(rollback_digest, str) or not _IMAGE_DIGEST.fullmatch(rollback_digest):
             violations.append(f"{prefix}:rollback_image_digest_must_be_immutable")
+        else:
+            rollback_digests.add(rollback_digest)
         if (
             isinstance(model_digest, str)
             and isinstance(rollback_digest, str)
@@ -111,6 +117,11 @@ def gpu_node_readiness_violations(
             age = (now - observed_at).total_seconds()
             if age < 0 or age > maximum_age_seconds:
                 violations.append(f"{prefix}:readiness_evidence_is_not_fresh")
+
+    if len(model_digests) > 1:
+        violations.append("fleet:model_image_digest_must_match_all_nodes")
+    if len(rollback_digests) > 1:
+        violations.append("fleet:rollback_image_digest_must_match_all_nodes")
 
     return tuple(violations)
 
